@@ -36,6 +36,7 @@ public:
         ZIGZAG    =    24,  // ZIGZAG mode is able to fly in a zigzag manner with predefined point A and point B
         SYSTEMID  =    25,  // System ID mode produces automated system identification signals in the controllers
         AUTOROTATE =   26,  // Autonomous autorotation
+        QUBE       =   27,  // 3D Square mode
     };
 
     // constructor
@@ -1553,3 +1554,108 @@ private:
 
 };
 #endif
+
+// Mode Qube
+class ModeQube : public Mode {
+
+public:
+    // inherit constructor
+    using Mode::Mode;
+
+    bool init(bool ignore_checks) override;
+    void run() override {
+        return run(true);
+    }
+    void run(bool disarm_on_land);
+
+    bool requires_GPS() const override { return true; }
+    bool has_manual_throttle() const override { return false; }
+    bool allows_arming(bool from_gcs) const override { return false; };
+    bool is_autopilot() const override { return true; }
+
+    bool requires_terrain_failsafe() const override { return true; }
+
+    // for reporting to GCS
+    bool get_wp(Location &loc) override;
+
+    // RTL states
+    enum QUBEState {
+        QUBE_Starting,
+        QUBE_InitialClimb,
+        QUBE_ReturnHome,
+        QUBE_LoiterAtHome,
+        QUBE_FinalDescent,
+        QUBE_Land,
+        QUBE_InitialQube
+    };
+    QUBEState state() { return _state; }
+
+    // this should probably not be exposed
+    bool state_complete() { return _state_complete; }
+
+    bool is_landing() const override;
+
+    void restart_without_terrain();
+
+    // enum for QUBE_ALT_TYPE parameter
+    enum class QUBEAltType {
+        QUBE_ALTTYPE_RELATIVE = 0,
+        QUBE_ALTTYPE_TERRAIN = 1
+    };
+    ModeQube::QUBEAltType get_alt_type() const;
+
+protected:
+
+    const char *name() const override { return "QUBE"; }
+    const char *name4() const override { return "QUBE"; }
+
+    // for reporting to GCS
+    uint32_t wp_distance() const override;
+    int32_t wp_bearing() const override;
+    float crosstrack_error() const override { return wp_nav->crosstrack_error();}
+
+    void descent_start();
+    void descent_run();
+    void land_start();
+    void land_run(bool disarm_on_land);
+
+    void set_descent_target_alt(uint32_t alt) { qube_path.descent_target.alt = alt; }
+
+private:
+
+    void climb_start();
+    void qube_start();
+    void return_start();
+    void climb_return_run();
+    void qube_run();
+    void loiterathome_start();
+    void loiterathome_run();
+    void build_path();
+    void compute_return_target();
+
+    QUBEState _state = QUBE_InitialClimb;  // records state of rtl (initial climb, returning home, etc)
+    bool _state_complete = false; // set to true if the current state is completed
+
+    struct {
+        // NEU w/ Z element alt-above-ekf-origin unless use_terrain is true in which case Z element is alt-above-terrain
+        Location origin_point;
+        Location climb_target;
+        Location return_target;
+        Location descent_target;
+        Location qube_targets[10];
+        uint8_t qube_index;
+        bool land;
+    } qube_path;
+
+    // return target alt type
+    enum class ReturnTargetAltType {
+        RETURN_TARGET_ALTTYPE_RELATIVE = 0,
+        RETURN_TARGET_ALTTYPE_RANGEFINDER = 1,
+        RETURN_TARGET_ALTTYPE_TERRAINDATABASE = 2
+    };
+
+    // Loiter timer - Records how long we have been in loiter
+    uint32_t _loiter_start_time;
+
+    bool terrain_following_allowed;
+};

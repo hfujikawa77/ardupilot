@@ -391,6 +391,11 @@ public:
     AP_Int16        rtl_altitude;
     AP_Int16        rtl_speed_cms;
     AP_Float        rtl_cone_slope;
+
+    AP_Int16        qube_altitude;
+    AP_Int16        qube_speed_cms;
+    AP_Float        qube_cone_slope;
+
 #if RANGEFINDER_ENABLED == ENABLED
     AP_Float        rangefinder_gain;
 #endif
@@ -402,6 +407,9 @@ public:
     AP_Int16        rtl_alt_final;
     AP_Int16        rtl_climb_min;              // rtl minimum climb in cm
 
+    AP_Int16        qube_alt_final;
+    AP_Int16        qube_climb_min;              // rtl minimum climb in cm
+
     AP_Int8         wp_yaw_behavior;            // controls how the autopilot controls yaw during missions
 
     AP_Int16        poshold_brake_rate;         // PosHold flight mode's rotation rate during braking in deg/sec
@@ -410,6 +418,7 @@ public:
     // Waypoints
     //
     AP_Int32        rtl_loiter_time;
+    AP_Int32        qube_loiter_time;
     AP_Int16        land_speed;
     AP_Int16        land_speed_high;
     AP_Int16        pilot_speed_up;    // maximum vertical ascending velocity the pilot may request
@@ -451,6 +460,7 @@ public:
 #endif
 
     AP_Int8         rtl_alt_type;
+    AP_Int8         qube_alt_type;
 
     AP_Int16                rc_speed; // speed of fast RC Channels in Hz
 
