@@ -629,6 +629,9 @@ public:
 
     AP_Float fs_gcs_timeout;
 
+#if MODE_SPIRALACRO_ENABLED == ENABLED
+    AP_Int32 spiralacro_options;
+#endif
 };
 
 extern const AP_Param::Info        var_info[];

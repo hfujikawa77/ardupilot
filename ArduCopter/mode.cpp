@@ -169,6 +169,12 @@ Mode *Copter::mode_from_mode_num(const Mode::Number mode)
             break;
 #endif
 
+#if MODE_SPIRALACRO_ENABLED == ENABLED
+        case Mode::Number::SPIRALACRO:
+            ret = &mode_spiralacro;
+            break;
+#endif
+
         default:
             break;
     }

@@ -366,6 +366,12 @@
 #endif
 //////////////////////////////////////////////////////////////////////////////
 
+//////////////////////////////////////////////////////////////////////////////
+// SpiralAcro - original fright mode
+#ifndef MODE_SPIRALACRO_ENABLED
+# define MODE_SPIRALACRO_ENABLED ENABLED
+#endif
+
 // Beacon support - support for local positioning systems
 #ifndef BEACON_ENABLED
 # define BEACON_ENABLED !HAL_MINIMIZE_FEATURES

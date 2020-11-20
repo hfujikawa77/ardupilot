@@ -36,6 +36,7 @@ public:
         ZIGZAG    =    24,  // ZIGZAG mode is able to fly in a zigzag manner with predefined point A and point B
         SYSTEMID  =    25,  // System ID mode produces automated system identification signals in the controllers
         AUTOROTATE =   26,  // Autonomous autorotation
+        SPIRALACRO =   27,  // Spiral acro mode
     };
 
     // constructor
@@ -1574,3 +1575,58 @@ private:
 
 };
 #endif
+
+class ModeSpiralAcro : public Mode {
+
+public:
+    // inherit constructor
+    using Mode::Mode;
+
+    bool init(bool ignore_checks) override;
+    virtual void run() override;
+
+    bool requires_GPS() const override { return false; }
+    bool has_manual_throttle() const override { return true; }
+    bool allows_arming(bool from_gcs) const override { return true; };
+    bool is_autopilot() const override { return false; }
+
+    // Sporal Acro States
+    enum SPRALACROState{
+        SPIRALACRO_Init,
+        SPIRALACRO_RunTakeoff,
+        SPIRALACRO_RunSpiral,
+        SPIRALACRO_RunAcro,
+        SPIRALACRO_RunRtl
+    };
+    SPRALACROState state() { return _state; }   
+
+    enum SPIRALACROParam{
+        TakeOffAltcm  = 100,     // 10m
+        SpiralAltcm  = 1000      // 100m
+    };
+
+protected:
+
+    const char *name() const override { return "SPIRALACRO"; }
+    const char *name4() const override { return "SPACRO"; }
+
+    uint32_t wp_distance() const override;
+    int32_t wp_bearing() const override;
+
+private:
+    SPRALACROState _state = SPIRALACRO_Init;  // records state of spiralacro (takeoff,spiral,acro,rtl)
+
+  // use fright mode start function
+    void takeoff_start();
+    void spiral_start();
+    void acro_start();
+    void rtl_start();
+
+  // use fright mode run function
+    void takeoff_run();
+    void spiral_run();
+    void acro_run();
+    void rtl_run();
+
+
+};
