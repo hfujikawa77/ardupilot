@@ -1587,12 +1587,13 @@ public:
 
     bool requires_GPS() const override { return false; }
     bool has_manual_throttle() const override { return true; }
-    bool allows_arming(bool from_gcs) const override { return true; };
+    bool allows_arming(bool from_gcs) const override;
     bool is_autopilot() const override { return false; }
 
     // Sporal Acro States
     enum SPRALACROState{
         SPIRALACRO_Init,
+        SPIRALACRO_RunWaitArming,
         SPIRALACRO_RunTakeoff,
         SPIRALACRO_RunSpiral,
         SPIRALACRO_RunAcro,
@@ -1601,8 +1602,8 @@ public:
     SPRALACROState state() { return _state; }   
 
     enum SPIRALACROParam{
-        TakeOffAltcm  = 100,     // 10m
-        SpiralAltcm  = 1000      // 100m
+        TakeOffAltcm  = 1000,     // 10m (cm)
+        SpiralAltcm  =  10000     // 100m (cm)
     };
 
 protected:
@@ -1614,6 +1615,11 @@ protected:
     int32_t wp_bearing() const override;
 
 private:
+    // enum for SPIRALACRO_OPTIONS parameter
+    enum class Options : int32_t {
+        AllowArmingFromTX = (1U << 0),
+    };
+
     SPRALACROState _state = SPIRALACRO_Init;  // records state of spiralacro (takeoff,spiral,acro,rtl)
 
   // use fright mode start function
@@ -1623,6 +1629,7 @@ private:
     void rtl_start();
 
   // use fright mode run function
+    void waitarming_run();
     void takeoff_run();
     void spiral_run();
     void acro_run();
