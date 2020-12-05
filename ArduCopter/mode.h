@@ -1585,10 +1585,10 @@ public:
     bool init(bool ignore_checks) override;
     virtual void run() override;
 
-    bool requires_GPS() const override { return false; }
-    bool has_manual_throttle() const override { return true; }
+    bool requires_GPS() const override { return true; }
+    bool has_manual_throttle() const override { return false; }
     bool allows_arming(bool from_gcs) const override;
-    bool is_autopilot() const override { return false; }
+    bool is_autopilot() const override { return true; }
 
     // Sporal Acro States
     enum SPRALACROState{
@@ -1621,6 +1621,9 @@ private:
     };
 
     SPRALACROState _state = SPIRALACRO_Init;  // records state of spiralacro (takeoff,spiral,acro,rtl)
+
+    bool pilot_yaw_override = false; // true if pilot is overriding yaw
+    bool speed_changing = false;     // true when the roll stick is being held to facilitate stopping at 0 rate
 
   // use fright mode start function
     void takeoff_start();
