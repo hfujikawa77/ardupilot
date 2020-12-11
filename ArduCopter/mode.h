@@ -1605,6 +1605,14 @@ public:
         TakeOffAltcm  = 1000,     // 10m (cm)
         SpiralAltcm  =  10000     // 100m (cm)
     };
+    
+    enum SPIRALACROSubmode{
+        Submode_MoveAboveHP = 1,
+        Submode_FlipStart = 2, 
+        Submode_FlipRoll = 3, 
+        Submode_FlipRecover = 4, 
+        Submode_AcroEnd = 5
+    };
 
 protected:
 
@@ -1621,6 +1629,9 @@ private:
     };
 
     SPRALACROState _state = SPIRALACRO_Init;  // records state of spiralacro (takeoff,spiral,acro,rtl)
+    SPIRALACROSubmode _state_submode = Submode_MoveAboveHP; // acro start mode
+
+    Vector3f orig_attitude;         // original vehicle attitude before flip
 
     bool pilot_yaw_override = false; // true if pilot is overriding yaw
     bool speed_changing = false;     // true when the roll stick is being held to facilitate stopping at 0 rate
