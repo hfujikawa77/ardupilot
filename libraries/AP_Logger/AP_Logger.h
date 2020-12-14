@@ -80,9 +80,7 @@ enum class LogEvent : uint8_t {
     AVOIDANCE_PROXIMITY_ENABLE = 65,
     AVOIDANCE_PROXIMITY_DISABLE = 66,
     GPS_PRIMARY_CHANGED = 67,
-    WINCH_RELAXED = 68,
-    WINCH_LENGTH_CONTROL = 69,
-    WINCH_RATE_CONTROL = 70,
+    // 68, 69, 70 were winch events
     ZIGZAG_STORE_A = 71,
     ZIGZAG_STORE_B = 72,
     LAND_REPO_ACTIVE = 73,
@@ -211,6 +209,9 @@ public:
     /* Write an *important* block of data at current offset */
     void WriteCriticalBlock(const void *pBuffer, uint16_t size);
 
+    /* Write a block of replay data at current offset */
+    bool WriteReplayBlock(uint8_t msg_id, const void *pBuffer, uint16_t size);
+
     // high level interface
     uint16_t find_last_log() const;
     void get_log_boundaries(uint16_t log_num, uint32_t & start_page, uint32_t & end_page);
@@ -229,9 +230,8 @@ public:
     void Write_Event(LogEvent id);
     void Write_Error(LogErrorSubsystem sub_system,
                      LogErrorCode error_code);
-    void Write_GPS(uint8_t instance, uint64_t time_us=0);
+    void Write_GPS(uint8_t instance);
     void Write_IMU();
-    void Write_IMUDT(uint64_t time_us, uint8_t imu_mask);
     bool Write_ISBH(uint16_t seqno,
                         AP_InertialSensor::IMU_SENSOR_TYPE sensor_type,
                         uint8_t instance,
@@ -249,7 +249,7 @@ public:
     void Write_RCOUT(void);
     void Write_RSSI();
     void Write_Rally();
-    void Write_Baro(uint64_t time_us=0);
+    void Write_Baro();
     void Write_Power(void);
     void Write_AHRS2();
     void Write_POS();
@@ -265,7 +265,7 @@ public:
     void Write_Attitude(const Vector3f &targets);
     void Write_AttitudeView(AP_AHRS_View &ahrs, const Vector3f &targets);
     void Write_Current();
-    void Write_Compass(uint64_t time_us=0);
+    void Write_Compass();
     void Write_Mode(uint8_t mode, const ModeReason reason);
 
     void Write_EntireMission();
@@ -282,14 +282,17 @@ public:
                           uint8_t sequence,
                           const RallyLocation &rally_point);
     void Write_VisualOdom(float time_delta, const Vector3f &angle_delta, const Vector3f &position_delta, float confidence);
-    void Write_VisualPosition(uint64_t remote_time_us, uint32_t time_ms, float x, float y, float z, float roll, float pitch, float yaw, float pos_err, float ang_err, uint8_t reset_counter);
-    void Write_VisualVelocity(uint64_t remote_time_us, uint32_t time_ms, const Vector3f &vel, float vel_err, uint8_t reset_counter);
+    void Write_VisualPosition(uint64_t remote_time_us, uint32_t time_ms, float x, float y, float z, float roll, float pitch, float yaw, float pos_err, float ang_err, uint8_t reset_counter, bool ignored);
+    void Write_VisualVelocity(uint64_t remote_time_us, uint32_t time_ms, const Vector3f &vel, float vel_err, uint8_t reset_counter, bool ignored);
     void Write_AOA_SSA(AP_AHRS &ahrs);
     void Write_Beacon(AP_Beacon &beacon);
     void Write_Proximity(AP_Proximity &proximity);
     void Write_SRTL(bool active, uint16_t num_points, uint16_t max_points, uint8_t action, const Vector3f& point);
-    void Write_OABendyRuler(bool active, float target_yaw, bool ignore_chg, float margin, const Location &final_dest, const Location &oa_dest);
+    void Write_OABendyRuler(uint8_t type, bool active, float target_yaw, float target_pitch, bool ignore_chg, float margin, const Location &final_dest, const Location &oa_dest);
     void Write_OADijkstra(uint8_t state, uint8_t error_id, uint8_t curr_point, uint8_t tot_points, const Location &final_dest, const Location &oa_dest);
+    void Write_SimpleAvoidance(uint8_t state, const Vector2f& desired_vel, const Vector2f& modified_vel, bool back_up);
+    void Write_Winch(bool healthy, bool thread_end, bool moving, bool clutch, uint8_t mode, float desired_length, float length, float desired_rate, uint16_t tension, float voltage, int8_t temp);
+    void Write_PSC(const Vector3f &pos_target, const Vector3f &position, const Vector3f &vel_target, const Vector3f &velocity, const Vector3f &accel_target, const float &accel_x, const float &accel_y);
 
     void Write(const char *name, const char *labels, const char *fmt, ...);
     void Write(const char *name, const char *labels, const char *units, const char *mults, const char *fmt, ...);
@@ -325,6 +328,10 @@ public:
 
     void periodic_tasks(); // may want to split this into GCS/non-GCS duties
 
+    // We may need to make sure data is loggable before starting the
+    // EKF; when allow_start_ekf we should be able to log that data
+    bool allow_start_ekf() const;
+
     // number of blocks that have been dropped
     uint32_t num_dropped(void) const;
 
@@ -332,14 +339,14 @@ public:
     void set_force_log_disarmed(bool force_logging) { _force_log_disarmed = force_logging; }
     bool log_while_disarmed(void) const;
     uint8_t log_replay(void) const { return _params.log_replay; }
-    
+
     vehicle_startup_message_Writer _vehicle_messages;
 
     // parameter support
     static const struct AP_Param::GroupInfo        var_info[];
     struct {
         AP_Int8 backend_types;
-        AP_Int8 file_bufsize; // in kilobytes
+        AP_Int16 file_bufsize; // in kilobytes
         AP_Int8 file_disarm_rot;
         AP_Int8 log_disarmed;
         AP_Int8 log_replay;
@@ -449,17 +456,13 @@ private:
 
     bool _armed;
 
-    void Write_Baro_instance(uint64_t time_us, uint8_t baro_instance, enum LogMessages type);
-    void Write_IMU_instance(uint64_t time_us,
-                                uint8_t imu_instance,
-                                enum LogMessages type);
-    void Write_Compass_instance(uint64_t time_us,
-                                    uint8_t mag_instance,
-                                    enum LogMessages type);
+    // state to help us not log unneccesary RCIN values:
+    bool seen_nonzero_rcin15_or_rcin16;
+
+    void Write_Baro_instance(uint64_t time_us, uint8_t baro_instance);
+    void Write_IMU_instance(uint64_t time_us, uint8_t imu_instance);
+    void Write_Compass_instance(uint64_t time_us, uint8_t mag_instance);
     void Write_Current_instance(uint64_t time_us, uint8_t battery_instance);
-    void Write_IMUDT_instance(uint64_t time_us,
-                                  uint8_t imu_instance,
-                                  enum LogMessages type);
 
     void backend_starting_new_log(const AP_Logger_Backend *backend);
 
@@ -470,7 +473,7 @@ private:
     void validate_structures(const struct LogStructure *logstructures, const uint8_t num_types);
     void dump_structure_field(const struct LogStructure *logstructure, const char *label, const uint8_t fieldnum);
     void dump_structures(const struct LogStructure *logstructures, const uint8_t num_types);
-    void assert_same_fmt_for_name(const log_write_fmt *f,
+    bool assert_same_fmt_for_name(const log_write_fmt *f,
                                   const char *name,
                                   const char *labels,
                                   const char *units,
@@ -487,6 +490,9 @@ private:
 
     bool _writes_enabled:1;
     bool _force_log_disarmed:1;
+
+    // remember formats for replay
+    void save_format_Replay(const void *pBuffer);
 
     /* support for retrieving logs via mavlink: */
 

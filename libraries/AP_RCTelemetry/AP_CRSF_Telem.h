@@ -15,9 +15,14 @@
 #pragma once
 
 #include <AP_HAL/AP_HAL.h>
+#include <AP_HAL/AP_HAL_Boards.h>
 
 #ifndef HAL_CRSF_TELEM_ENABLED
 #define HAL_CRSF_TELEM_ENABLED !HAL_MINIMIZE_FEATURES
+#endif
+
+#ifndef HAL_CRSF_TELEM_TEXT_SELECTION_ENABLED
+#define HAL_CRSF_TELEM_TEXT_SELECTION_ENABLED HAL_CRSF_TELEM_ENABLED && BOARD_FLASH_SIZE > 1024
 #endif
 
 #if HAL_CRSF_TELEM_ENABLED
@@ -28,6 +33,8 @@
 #include <AP_RCProtocol/AP_RCProtocol_CRSF.h>
 #include "AP_RCTelemetry.h"
 #include <AP_HAL/utility/sparse-endian.h>
+
+class AP_OSD_ParamSetting;
 
 class AP_CRSF_Telem : public AP_RCTelemetry {
 public:
@@ -90,22 +97,10 @@ public:
         uint8_t pitmode;            // disable 0, enable 1
     } PACKED;
 
-    struct LinkStatisticsFrame {
-        uint8_t uplink_rssi_ant1; // ( dBm * -1 )
-        uint8_t uplink_rssi_ant2; // ( dBm * -1 )
-        uint8_t uplink_status; // Package success rate / Link quality ( % )
-        int8_t uplink_snr; // ( db )
-        uint8_t active_antenna; // Diversity active antenna ( enum ant. 1 = 0, ant. 2 )
-        uint8_t rf_mode; // ( enum 4fps = 0 , 50fps, 150hz)
-        uint8_t uplink_tx_power; // ( enum 0mW = 0, 10mW, 25 mW, 100 mW, 500 mW, 1000 mW, 2000mW )
-        uint8_t downlink_rssi; // ( dBm * -1 )
-        uint8_t downlink_status; // Downlink package success rate / Link quality ( % ) ● int8_t Downlink SNR ( db )
-    } PACKED;
-
     struct AttitudeFrame {
-        int16_t pitch_angle; // ( rad / 10000 )
-        int16_t roll_angle; // ( rad / 10000 )
-        int16_t yaw_angle; // ( rad / 10000 )
+        int16_t pitch_angle; // ( rad * 10000 )
+        int16_t roll_angle; // ( rad * 10000 )
+        int16_t yaw_angle; // ( rad * 10000 )
     } PACKED;
 
     struct FlightModeFrame {
@@ -126,12 +121,63 @@ public:
         uint8_t origin;
     } PACKED;
 
+    // CRSF_FRAMETYPE_PARAM_DEVICE_INFO
+    struct ParameterDeviceInfoFrame {
+        uint8_t destination;
+        uint8_t origin;
+        uint8_t payload[58];   // largest possible frame is 60
+    } PACKED;
+
+    enum ParameterType : uint8_t
+    {
+        UINT8 = 0,
+        INT8 = 1,
+        UINT16 = 2,
+        INT16 = 3,
+        FLOAT = 8,
+        TEXT_SELECTION = 9,
+        STRING = 10,
+        FOLDER = 11,
+        INFO = 12,
+        COMMAND = 13,
+        OUT_OF_RANGE = 127
+    };
+
+    // CRSF_FRAMETYPE_PARAMETER_SETTINGS_ENTRY
+    struct ParameterSettingsEntryHeader {
+        uint8_t destination;
+        uint8_t origin;
+        uint8_t param_num;
+        uint8_t chunks_left;
+    } PACKED;
+
+    // CRSF_FRAMETYPE_PARAMETER_SETTINGS_ENTRY
+    struct ParameterSettingsEntry {
+        ParameterSettingsEntryHeader header;
+        uint8_t payload[56];   // largest possible frame is 60
+    } PACKED;
+
+    // CRSF_FRAMETYPE_PARAMETER_READ
+    struct ParameterSettingsReadFrame {
+        uint8_t destination;
+        uint8_t origin;
+        uint8_t param_num;
+        uint8_t param_chunk;
+    } PACKED _param_request;
+
+    // CRSF_FRAMETYPE_PARAMETER_WRITE
+    struct ParameterSettingsWriteFrame {
+        uint8_t destination;
+        uint8_t origin;
+        uint8_t param_num;
+        uint8_t payload[57];   // largest possible frame is 60
+    } PACKED;
+
     union BroadcastFrame {
         GPSFrame gps;
         HeartbeatFrame heartbeat;
         BatteryFrame battery;
         VTXFrame vtx;
-        LinkStatisticsFrame link;
         AttitudeFrame attitude;
         FlightModeFrame flightmode;
     } PACKED;
@@ -139,6 +185,10 @@ public:
     union ExtendedFrame {
         CommandFrame command;
         ParameterPingFrame ping;
+        ParameterDeviceInfoFrame info;
+        ParameterSettingsEntry param_entry;
+        ParameterSettingsReadFrame param_read;
+        ParameterSettingsWriteFrame param_write;
     } PACKED;
 
     union TelemetryPayload {
@@ -157,8 +207,9 @@ private:
 
     enum SensorType {
         HEARTBEAT,
-        ATTITUDE,
         PARAMETERS,
+        ATTITUDE,
+        VTX_PARAMETERS,
         BATTERY,
         GPS,
         FLIGHT_MODE,
@@ -176,10 +227,19 @@ private:
     void calc_gps();
     void calc_attitude();
     void calc_flight_mode();
+    void calc_device_info();
+    void calc_parameter();
+#if HAL_CRSF_TELEM_TEXT_SELECTION_ENABLED
+    void calc_text_selection( AP_OSD_ParamSetting* param, uint8_t chunk);
+#endif
     void update_params();
+    void update_vtx_params();
 
     void process_vtx_frame(VTXFrame* vtx);
     void process_vtx_telem_frame(VTXTelemetryFrame* vtx);
+    void process_ping_frame(ParameterPingFrame* ping);
+    void process_param_read_frame(ParameterSettingsReadFrame* read);
+    void process_param_write_frame(ParameterSettingsWriteFrame* write);
 
      // setup ready for passthrough operation
     void setup_wfq_scheduler(void) override;
@@ -194,6 +254,7 @@ private:
 
     bool _telem_pending;
     bool _enable_telemetry;
+    uint8_t _request_pending;
 
     // vtx state
     bool _vtx_freq_update;  // update using the frequency method or not

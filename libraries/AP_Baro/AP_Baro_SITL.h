@@ -32,7 +32,10 @@ private:
 
     // adjust for simulated board temperature
     void temperature_adjustment(float &p, float &T);
-    
+
+    // adjust for wind effects
+    float wind_pressure_correction(void);
+
     // is the barometer usable for flight 
     bool healthy(uint8_t instance);
     
@@ -41,6 +44,7 @@ private:
     uint32_t _last_sample_time;
     float _recent_temp;
     float _recent_press;
+    float _last_altitude;
 
 };
 #endif  // CONFIG_HAL_BOARD
