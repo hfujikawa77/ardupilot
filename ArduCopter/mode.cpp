@@ -169,12 +169,6 @@ Mode *Copter::mode_from_mode_num(const Mode::Number mode)
             break;
 #endif
 
-#if MODE_QUBE_ENABLED == ENABLED
-        case Mode::Number::QUBE:
-            ret = &mode_qube;
-            break;
-#endif
-
         default:
             break;
     }

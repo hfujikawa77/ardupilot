@@ -350,12 +350,6 @@
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
-// Qube - 3D Square Mode
-#ifndef MODE_QUBE_ENABLED
-# define MODE_QUBE_ENABLED ENABLED
-#endif
-
-//////////////////////////////////////////////////////////////////////////////
 
 //////////////////////////////////////////////////////////////////////////////
 // Autorotate - autonomous auto-rotation - helicopters only
@@ -538,39 +532,6 @@
 
 #ifndef RTL_LOITER_TIME
  # define RTL_LOITER_TIME           5000    // Time (in milliseconds) to loiter above home before beginning final descent
-#endif
-
-// QUBE Mode
-#ifndef QUBE_ALT_FINAL
- # define QUBE_ALT_FINAL             0       // the altitude the vehicle will move to as the final stage of Returning to Launch.  Set to zero to land.
-#endif
-
-#ifndef QUBE_ALT
- # define QUBE_ALT                   1500    // default alt to return to home in cm, 0 = Maintain current altitude
-#endif
-
-#ifndef QUBE_ALT_MIN
- # define QUBE_ALT_MIN               200     // min height above ground for RTL (i.e 2m)
-#endif
-
-#ifndef QUBE_CLIMB_MIN_DEFAULT
- # define QUBE_CLIMB_MIN_DEFAULT     0       // vehicle will always climb this many cm as first stage of RTL
-#endif
-
-#ifndef QUBE_ABS_MIN_CLIMB
- # define QUBE_ABS_MIN_CLIMB         250     // absolute minimum initial climb
-#endif
-
-#ifndef QUBE_CONE_SLOPE_DEFAULT
- # define QUBE_CONE_SLOPE_DEFAULT    3.0f    // slope of RTL cone (height / distance). 0 = No cone
-#endif
-
-#ifndef QUBE_MIN_CONE_SLOPE
- # define QUBE_MIN_CONE_SLOPE        0.5f    // minimum slope of cone
-#endif
-
-#ifndef QUBE_LOITER_TIME
- # define QUBE_LOITER_TIME           5000    // Time (in milliseconds) to loiter above home before beginning final descent
 #endif
 
 // AUTO Mode
