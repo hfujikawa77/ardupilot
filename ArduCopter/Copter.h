@@ -220,6 +220,7 @@ public:
     friend class ModeThrow;
     friend class ModeZigZag;
     friend class ModeAutorotate;
+    friend class ModeLoiter_POI;
 
     Copter(void);
 
@@ -977,6 +978,9 @@ private:
 #endif
 #if MODE_AUTOROTATE_ENABLED == ENABLED
     ModeAutorotate mode_autorotate;
+#endif
+#if MODE_LOITER_ENABLED == ENABLED
+    ModeLoiter_POI mode_loiter_poi;
 #endif
 
     // mode.cpp
