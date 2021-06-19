@@ -36,6 +36,7 @@ public:
         ZIGZAG    =    24,  // ZIGZAG mode is able to fly in a zigzag manner with predefined point A and point B
         SYSTEMID  =    25,  // System ID mode produces automated system identification signals in the controllers
         AUTOROTATE =   26,  // Autonomous autorotation
+        LOITER_POI =   27,  // automatic roll/pitch acceleration with automatic throttle, automacic yaw control to POI
     };
 
     // constructor
@@ -1710,3 +1711,47 @@ private:
 
 };
 #endif
+
+class ModeLoiter_POI : public Mode {
+
+public:
+    // inherit constructor
+    using Mode::Mode;
+    Number mode_number() const override { return Number::LOITER_POI; }
+
+    bool init(bool ignore_checks) override;
+    void run() override;
+
+    bool requires_GPS() const override { return true; }
+    bool has_manual_throttle() const override { return false; }
+    bool allows_arming(AP_Arming::Method method) const override { return true; };
+    bool is_autopilot() const override { return false; }
+    bool has_user_takeoff(bool must_navigate) const override { return true; }
+    bool allows_autotune() const override { return true; }
+
+#if PRECISION_LANDING == ENABLED
+    void set_precision_loiter_enabled(bool value) { _precision_loiter_enabled = value; }
+#endif
+
+protected:
+
+    const char *name() const override { return "LOITER_POI"; }
+    const char *name4() const override { return "LOPO"; }
+
+    uint32_t wp_distance() const override;
+    int32_t wp_bearing() const override;
+
+#if PRECISION_LANDING == ENABLED
+    bool do_precision_loiter();
+    void precision_loiter_xy();
+#endif
+
+private:
+
+    Location poi_location{};      // Waypoint location
+
+#if PRECISION_LANDING == ENABLED
+    bool _precision_loiter_enabled;
+#endif
+
+};
