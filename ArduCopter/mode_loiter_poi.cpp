@@ -30,6 +30,12 @@ bool ModeLoiter_POI::init(bool ignore_checks)
         pos_control->init_z_controller();
     }
 
+    poi_location.alt = 0;
+    poi_location.lat = 34.8411778;
+    poi_location.lng = 136.2155248;
+    auto_yaw.set_roi(poi_location);
+    auto_yaw.set_mode(AUTO_YAW_ROI);
+
     return true;
 }
 
@@ -92,7 +98,7 @@ void ModeLoiter_POI::run()
         loiter_nav->set_pilot_desired_acceleration(target_roll, target_pitch);
 
         // get pilot's desired yaw rate
-        target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->get_control_in());
+        // target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->get_control_in());
 
         // get pilot desired climb rate
         target_climb_rate = get_pilot_desired_climb_rate(channel_throttle->get_control_in());
