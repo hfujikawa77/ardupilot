@@ -31,8 +31,8 @@ bool ModeLoiter_POI::init(bool ignore_checks)
     }
 
     poi_location.alt = 0;
-    poi_location.lat = 34.8411778;
-    poi_location.lng = 136.2155248;
+    poi_location.lat = (int32_t)(34.8411778 * 1.0E+7);
+    poi_location.lng = (int32_t)(136.2155248 * 1.0E+7);
     auto_yaw.set_roi(poi_location);
     auto_yaw.set_mode(AUTO_YAW_ROI);
 
