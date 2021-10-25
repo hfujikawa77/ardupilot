@@ -378,6 +378,9 @@ public:
         k_param_vehicle = 257, // vehicle common block of parameters
 
         // the k_param_* space is 9-bits in size
+
+        k_param_loiterpoi_activate_distance = 260,
+
         // 511: reserved
     };
 
@@ -471,6 +474,8 @@ public:
     AP_Float                acro_balance_pitch;
     AP_Int8                 acro_trainer;
     AP_Float                acro_rp_expo;
+
+    AP_Float                loiterpoi_activate_distance;
 
     // Note: keep initializers here in the same order as they are declared
     // above.
@@ -649,6 +654,13 @@ public:
     AP_Float rangefinder_filt;
 #endif
 
+#if MODE_GUIDED_ENABLED == ENABLED
+    AP_Float guided_timeout;
+#endif
+
+#if AP_TERRAIN_AVAILABLE && AC_TERRAIN
+    AP_Float terrain_margin;
+#endif
 };
 
 extern const AP_Param::Info        var_info[];

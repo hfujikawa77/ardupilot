@@ -9,6 +9,23 @@
 // loiter_init - initialise loiter controller
 bool ModeLoiter_POI::init(bool ignore_checks)
 {
+    bool isExist = false;
+
+    // Find MAV_CMD_DO_SET_ROI and set ROI position by command
+    uint16_t mission_count = copter.mode_auto.mission.num_commands();
+    for(uint16_t i=0 ; i < mission_count ; i++) {
+        AP_Mission::Mission_Command cmd;
+        if(copter.mode_auto.mission.get_next_do_cmd(i, cmd)) {
+            if(cmd.id == MAV_CMD_DO_SET_ROI) {
+                poi_location = cmd.content.location;
+                isExist = true;
+                break;
+            }
+        }
+    }
+    // Do not change to this mode when MAV_CMD_DO_SET_ROI is not exist
+    if(!isExist) return false;
+
     if (!copter.failsafe.radio) {
         float target_roll, target_pitch;
         // apply SIMPLE mode transform to pilot inputs
@@ -74,7 +91,6 @@ void ModeLoiter_POI::precision_loiter_xy()
 void ModeLoiter_POI::run()
 {
     float target_roll, target_pitch;
-    float target_yaw_rate = 0.0f;
     float target_climb_rate = 0.0f;
 
     // set vertical speed and acceleration limits
@@ -90,9 +106,6 @@ void ModeLoiter_POI::run()
 
         // process pilot's roll and pitch input
         loiter_nav->set_pilot_desired_acceleration(target_roll, target_pitch);
-
-        // get pilot's desired yaw rate
-        target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->get_control_in());
 
         // get pilot desired climb rate
         target_climb_rate = get_pilot_desired_climb_rate(channel_throttle->get_control_in());
@@ -118,7 +131,7 @@ void ModeLoiter_POI::run()
         attitude_control->reset_yaw_target_and_rate();
         pos_control->relax_z_controller(0.0f);   // forces throttle output to decay to zero
         loiter_nav->init_target();
-        attitude_control->input_thrust_vector_rate_heading(loiter_nav->get_thrust_vector(), target_yaw_rate);
+        attitude_control->input_thrust_vector_heading(loiter_nav->get_thrust_vector(), auto_yaw.yaw(), auto_yaw.rate_cds());
         break;
 
     case AltHold_Takeoff:
@@ -137,7 +150,8 @@ void ModeLoiter_POI::run()
         loiter_nav->update();
 
         // call attitude controller
-        attitude_control->input_thrust_vector_rate_heading(loiter_nav->get_thrust_vector(), target_yaw_rate);
+        auto_yaw.set_mode(AUTO_YAW_HOLD);
+        attitude_control->input_thrust_vector_heading(loiter_nav->get_thrust_vector(), auto_yaw.yaw(), auto_yaw.rate_cds());
         break;
 
     case AltHold_Landed_Ground_Idle:
@@ -147,7 +161,7 @@ void ModeLoiter_POI::run()
     case AltHold_Landed_Pre_Takeoff:
         attitude_control->reset_rate_controller_I_terms_smoothly();
         loiter_nav->init_target();
-        attitude_control->input_thrust_vector_rate_heading(loiter_nav->get_thrust_vector(), target_yaw_rate);
+        attitude_control->input_thrust_vector_heading(loiter_nav->get_thrust_vector(), auto_yaw.yaw(), auto_yaw.rate_cds());
         pos_control->relax_z_controller(0.0f);   // forces throttle output to decay to zero
         break;
 
@@ -164,8 +178,17 @@ void ModeLoiter_POI::run()
         // run loiter controller
         loiter_nav->update();
 
+        // AUTO YAW control enabled on over 3.0m from POI point
+        if(g.loiterpoi_activate_distance < copter.current_loc.get_distance(poi_location)) {
+            auto_yaw.set_roi(poi_location);
+            auto_yaw.set_mode(AUTO_YAW_ROI);
+        }
+        else {
+            auto_yaw.set_mode(AUTO_YAW_HOLD);
+        }
+
         // call attitude controller
-        attitude_control->input_thrust_vector_rate_heading(loiter_nav->get_thrust_vector(), target_yaw_rate);
+        attitude_control->input_thrust_vector_heading(loiter_nav->get_thrust_vector(), auto_yaw.yaw(), auto_yaw.rate_cds());
 
         // adjust climb rate using rangefinder
         target_climb_rate = copter.surface_tracking.adjust_climb_rate(target_climb_rate);
