@@ -39,6 +39,19 @@ public:
     // get desired lateral acceleration (for reporting purposes only because will be zero during pivot turns)
     float get_lat_accel() const { return _desired_lat_accel; }
 
+    // get desired lateral speed (for omni vehicles in fixed heading mode)
+    float get_lateral_speed() const { return _desired_lateral_speed; }
+
+    // fixed heading control for omni vehicles
+    // set fixed heading in radians (heading will be maintained while moving laterally to target)
+    void set_fixed_heading(float heading_rad);
+    // clear fixed heading (resume normal heading-to-target behavior)
+    void clear_fixed_heading();
+    // return true if fixed heading is set
+    bool has_fixed_heading() const { return _fixed_heading; }
+    // get fixed heading in radians
+    float get_fixed_heading_rad() const { return _fixed_heading_rad; }
+
     // set desired location and (optionally) next_destination
     // next_destination should be provided if known to allow smooth cornering
     virtual bool set_desired_location(const Location &destination, Location next_destination = Location()) WARN_IF_UNUSED;
@@ -185,9 +198,14 @@ protected:
     float _desired_speed_limited;   // desired speed (above) but accel/decel limited
     float _desired_turn_rate_rads;  // desired turn-rate in rad/sec (negative is counter clockwise, positive is clockwise)
     float _desired_lat_accel;       // desired lateral acceleration (for reporting only)
+    float _desired_lateral_speed;   // desired lateral speed (for omni vehicles in fixed heading mode)
     float _desired_heading_cd;      // desired heading (back towards line between origin and destination)
     float _wp_bearing_cd;           // heading to waypoint in centi-degrees
     float _cross_track_error;       // cross track error (in meters).  distance from current position to closest point on line between origin and destination
+
+    // fixed heading control for omni vehicles
+    bool _fixed_heading;            // true if vehicle should maintain fixed heading while moving
+    float _fixed_heading_rad;       // fixed heading in radians when _fixed_heading is true
 
     // variables for reporting
     float _distance_to_destination; // distance from vehicle to final destination in meters

@@ -563,6 +563,10 @@ bool ModeAuto::start_command(const AP_Mission::Mission_Command& cmd)
         do_set_home(cmd);
         break;
 
+    case MAV_CMD_CONDITION_YAW:
+        do_set_yaw(cmd);
+        break;
+
 #if HAL_MOUNT_ENABLED
     // Sets the region of interest (ROI) for a sensor set or the
     // vehicle itself. This can then be used by the vehicles control
@@ -705,6 +709,7 @@ bool ModeAuto::verify_command(const AP_Mission::Mission_Command& cmd)
     case MAV_CMD_DO_SET_REVERSE:
     case MAV_CMD_DO_FENCE_ENABLE:
     case MAV_CMD_DO_GUIDED_LIMITS:
+    case MAV_CMD_CONDITION_YAW:
         return true;
 
     default:
@@ -1011,6 +1016,31 @@ void ModeAuto::do_set_home(const AP_Mission::Mission_Command& cmd)
 void ModeAuto::do_set_reverse(const AP_Mission::Mission_Command& cmd)
 {
     set_reversed(cmd.p1 == 1);
+}
+
+// do_set_yaw - set fixed heading for omni vehicles to enable lateral movement
+void ModeAuto::do_set_yaw(const AP_Mission::Mission_Command& cmd)
+{
+    // only applicable to omni vehicles
+    if (!g2.motors.is_omni()) {
+        return;
+    }
+
+    float target_yaw_deg;
+
+    // get final angle, relative_angle = 1 means relative, 0 means absolute
+    if (cmd.content.yaw.relative_angle > 0) {
+        // relative angle
+        target_yaw_deg = wrap_180(degrees(ahrs.get_yaw()) + cmd.content.yaw.angle_deg);
+    } else {
+        // absolute angle
+        target_yaw_deg = cmd.content.yaw.angle_deg;
+    }
+
+    // set fixed heading on waypoint navigator
+    g2.wp_nav.set_fixed_heading(radians(target_yaw_deg));
+
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Set fixed heading: %.1f deg", static_cast<double>(target_yaw_deg));
 }
 
 // set timeout and position limits for guided within auto
