@@ -440,26 +440,50 @@ void Mode::navigate_to_waypoint()
     // do not do simple avoidance because this is already handled in the position controller
     calc_throttle(g2.wp_nav.get_speed(), false);
 
-    float desired_heading_cd = g2.wp_nav.oa_wp_bearing_cd();
-    if (g2.sailboat.use_indirect_route(desired_heading_cd)) {
-        // sailboats use heading controller when tacking upwind
-        desired_heading_cd = g2.sailboat.calc_heading(desired_heading_cd);
-        // use pivot turn rate for tacks
-        const float turn_rate = g2.sailboat.tacking() ? g2.wp_nav.get_pivot_rate() : 0.0f;
-        calc_steering_to_heading(desired_heading_cd, turn_rate);
-    } else {
-        // retrieve turn rate from waypoint controller
-        float desired_turn_rate_rads = g2.wp_nav.get_turn_rate_rads();
+    // check if we are an omni vehicle with fixed heading mode active
+    if (g2.motors.is_omni() && g2.wp_nav.has_fixed_heading()) {
+        // omni vehicle with fixed heading: use lateral movement to reach target
+        // get desired lateral speed from waypoint navigator
+        const float desired_lateral_speed = g2.wp_nav.get_lateral_speed();
 
-        // if simple avoidance is active at very low speed do not attempt to turn
+        // use lateral speed controller to get output
+        const float lateral_out = attitude_control.get_lateral_out_speed(
+            desired_lateral_speed,
+            g2.motors.limit.steer_left,   // reuse steering limits for lateral
+            g2.motors.limit.steer_right,
+            rover.G_Dt);
+
+        // send lateral output to motors (scale from -1~+1 to -100~+100)
+        g2.motors.set_lateral(lateral_out * 100.0f);
+
+        // use heading controller to maintain fixed heading
+        const float fixed_heading_cd = degrees(g2.wp_nav.get_fixed_heading_rad()) * 100.0f;
+        calc_steering_to_heading(fixed_heading_cd, 0.0f);
+    } else {
+        // clear lateral output for non-omni vehicles or when not using fixed heading
+        g2.motors.set_lateral(0.0f);
+
+        float desired_heading_cd = g2.wp_nav.oa_wp_bearing_cd();
+        if (g2.sailboat.use_indirect_route(desired_heading_cd)) {
+            // sailboats use heading controller when tacking upwind
+            desired_heading_cd = g2.sailboat.calc_heading(desired_heading_cd);
+            // use pivot turn rate for tacks
+            const float turn_rate = g2.sailboat.tacking() ? g2.wp_nav.get_pivot_rate() : 0.0f;
+            calc_steering_to_heading(desired_heading_cd, turn_rate);
+        } else {
+            // retrieve turn rate from waypoint controller
+            float desired_turn_rate_rads = g2.wp_nav.get_turn_rate_rads();
+
+            // if simple avoidance is active at very low speed do not attempt to turn
 #if AP_AVOIDANCE_ENABLED
-        if (g2.avoid.limits_active() && (fabsf(attitude_control.get_desired_speed()) <= attitude_control.get_stop_speed())) {
-            desired_turn_rate_rads = 0.0f;
-        }
+            if (g2.avoid.limits_active() && (fabsf(attitude_control.get_desired_speed()) <= attitude_control.get_stop_speed())) {
+                desired_turn_rate_rads = 0.0f;
+            }
 #endif
 
-        // call turn rate steering controller
-        calc_steering_from_turn_rate(desired_turn_rate_rads);
+            // call turn rate steering controller
+            calc_steering_from_turn_rate(desired_turn_rate_rads);
+        }
     }
 }
 

@@ -109,6 +109,30 @@ public:
     // get forward speed in m/s (earth-frame horizontal velocity but only along vehicle x-axis).  returns true on success
     bool get_forward_speed(float &speed) const;
 
+    // get lateral speed in m/s (earth-frame horizontal velocity but only along vehicle y-axis).  returns true on success
+    bool get_lateral_speed(float &speed) const;
+
+    //
+    // lateral speed controller (for omni vehicles)
+    //
+
+    // return a lateral output from -1 to +1 given a desired lateral speed in m/s
+    // positive lateral speed is to the right
+    float get_lateral_out_speed(float desired_lateral_speed, bool motor_limit_low, bool motor_limit_high, float dt);
+
+    // get latest desired lateral speed in m/s recorded during calls to get_lateral_out_speed.  For reporting purposes only
+    float get_desired_lateral_speed() const;
+
+    // get acceleration limited desired lateral speed
+    float get_desired_lateral_speed_accel_limited(float desired_lateral_speed, float dt) const;
+
+    // check if lateral speed controller active
+    bool lateral_speed_control_active() const;
+
+    // get lateral speed controller PID for reporting and logging
+    AC_PID& get_lateral_speed_pid() { return _lateral_speed_pid; }
+    const AP_PIDInfo& get_lateral_speed_pid_info() const { return _lateral_speed_pid_info; }
+
     // get throttle/speed controller maximum acceleration (also used for deceleration)
     float get_accel_max() const { return MAX(_throttle_accel_max, 0.0f); }
 
@@ -183,4 +207,12 @@ private:
     // Sailboat heel control
     AC_PID   _sailboat_heel_pid;    // Sailboat heel angle pid controller
     uint32_t _heel_controller_last_ms = 0;
+
+    // lateral speed control (for omni vehicles)
+    AC_PID   _lateral_speed_pid;    // lateral speed controller
+    uint32_t _lateral_speed_last_ms = 0;  // system time of last call to get_lateral_out_speed
+    float    _desired_lateral_speed = 0;  // last recorded desired lateral speed
+    bool     _lateral_limit_low = false;  // lateral output was limited from going too low
+    bool     _lateral_limit_high = false; // lateral output was limited from going too high
+    AP_PIDInfo _lateral_speed_pid_info;   // local copy of lateral_speed controller's PID info
 };

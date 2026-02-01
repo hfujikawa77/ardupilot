@@ -356,6 +356,7 @@ private:
     void do_set_home(const AP_Mission::Mission_Command& cmd);
     void do_set_reverse(const AP_Mission::Mission_Command& cmd);
     void do_guided_limits(const AP_Mission::Mission_Command& cmd);
+    void do_set_yaw(const AP_Mission::Mission_Command& cmd);
 #if AP_SCRIPTING_ENABLED
     void do_nav_script_time(const AP_Mission::Mission_Command& cmd);
     bool verify_nav_script_time();
@@ -560,6 +561,10 @@ public:
 
     // set steering and throttle (-1 to +1).  Only called from scripts
     void set_steering_and_throttle(float steering, float throttle);
+
+    // set/clear fixed heading for omni vehicles (enables lateral movement while maintaining heading)
+    void set_fixed_heading(float heading_deg);
+    void clear_fixed_heading();
 
     // vehicle start loiter
     bool start_loiter();

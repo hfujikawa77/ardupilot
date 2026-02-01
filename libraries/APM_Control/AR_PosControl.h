@@ -61,6 +61,17 @@ public:
     float get_desired_speed() const { return _desired_speed; }
     float get_desired_turn_rate_rads() const { return _desired_turn_rate_rads; }
     float get_desired_lat_accel() const { return _desired_lat_accel; }
+    float get_desired_lateral_speed() const { return _desired_lateral_speed; }
+
+    // fixed heading control for omni vehicles
+    // set fixed heading in radians (heading will be maintained while moving laterally to target)
+    void set_fixed_heading(float heading_rad) { _fixed_heading_rad = heading_rad; _fixed_heading = true; }
+    // clear fixed heading (resume normal heading-to-target behavior)
+    void clear_fixed_heading() { _fixed_heading = false; }
+    // return true if fixed heading is set
+    bool has_fixed_heading() const { return _fixed_heading; }
+    // get fixed heading in radians
+    float get_fixed_heading_rad() const { return _fixed_heading_rad; }
 
     // get position target
     const Vector2p& get_pos_target() const { return _pos_target; }
@@ -124,6 +135,11 @@ private:
     float _desired_speed;           // desired forward_back speed in m/s
     float _desired_turn_rate_rads;  // desired turn-rate in rad/sec (negative is counter clockwise, positive is clockwise)
     float _desired_lat_accel;       // desired lateral acceleration (for reporting only)
+    float _desired_lateral_speed;   // desired lateral speed in m/s (positive is to the right)
+
+    // fixed heading control for omni vehicles
+    bool _fixed_heading;            // true if vehicle should maintain fixed heading while moving
+    float _fixed_heading_rad;       // fixed heading in radians when _fixed_heading is true
 
     // ekf reset handling
     uint32_t _ekf_xy_reset_ms;      // system time of last recorded ekf xy position reset

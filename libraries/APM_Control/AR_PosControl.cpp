@@ -119,6 +119,7 @@ void AR_PosControl::update(float dt)
     if (!hal.util->get_soft_armed() || !AP::ahrs().get_relative_position_NED_origin(curr_pos_NED_m) ||
         !AP::ahrs().get_velocity_NED(curr_vel_NED)) {
         _desired_speed = _atc.get_desired_speed_accel_limited(0.0f, dt);
+        _desired_lateral_speed = 0.0f;
         _desired_lat_accel = 0.0f;
         _desired_turn_rate_rads = 0.0f;
         return;
@@ -185,34 +186,67 @@ void AR_PosControl::update(float dt)
 
     // convert desired acceleration to desired forward-back speed, desired lateral speed and desired turn rate
 
-    // rotate acceleration into body frame using current heading
-    const Vector2f accel_target_FR = AP::ahrs().earth_to_body2D(_accel_target);
+    // check if we are using fixed heading mode (for omni vehicles)
+    if (_fixed_heading) {
+        // Fixed heading mode: vehicle maintains fixed heading and uses lateral movement to reach target
+        // rotate target velocity from earth-frame to body frame using FIXED heading (not current heading)
+        const float cos_fixed = cosf(_fixed_heading_rad);
+        const float sin_fixed = sinf(_fixed_heading_rad);
+        const Vector2f vel_target_FR{
+            _vel_target.x * cos_fixed + _vel_target.y * sin_fixed,   // forward component
+            -_vel_target.x * sin_fixed + _vel_target.y * cos_fixed   // lateral component (positive right)
+        };
 
-    // calculate minimum turn speed which is the max speed the vehicle could turn through the corner
-    // given the vehicle's turn radius and half its max lateral acceleration
-    // todo: remove MAX of zero when safe_sqrt fixed
-    float turn_speed_min = MAX(safe_sqrt(_atc.get_turn_lat_accel_max() * 0.5 * _turn_radius), 0);
-
-    // rotate target velocity from earth-frame to body frame
-    const Vector2f vel_target_FR = AP::ahrs().earth_to_body2D(_vel_target);
-
-    // desired speed is normally the forward component (only) of the target velocity
-    float des_speed = vel_target_FR.x;
-    if (!stopping) {
-        // do not let target speed fall below the minimum turn speed unless the vehicle is slowing down
-        const float abs_des_speed_min = MIN(_vel_target.length(), turn_speed_min);
+        // set desired forward speed
+        float des_speed = vel_target_FR.x;
         if (_reversed != backing_up) {
             // if reversed or backing up desired speed will be negative
-            des_speed = MIN(-abs_des_speed_min, vel_target_FR.x);
-        } else {
-            des_speed = MAX(abs_des_speed_min, vel_target_FR.x);
+            if (!stopping && is_positive(_vel_target.length())) {
+                des_speed = MIN(0.0f, vel_target_FR.x);
+            }
         }
-    }
-    _desired_speed = _atc.get_desired_speed_accel_limited(des_speed, dt);
+        _desired_speed = _atc.get_desired_speed_accel_limited(des_speed, dt);
 
-    // calculate turn rate from desired lateral acceleration
-    _desired_lat_accel = stopping ? 0 : accel_target_FR.y;
-    _desired_turn_rate_rads = _atc.get_turn_rate_from_lat_accel(_desired_lat_accel, _desired_speed);
+        // set desired lateral speed (positive is to the right)
+        _desired_lateral_speed = stopping ? 0.0f : vel_target_FR.y;
+
+        // calculate turn rate to point towards fixed heading
+        _desired_lat_accel = 0.0f;  // no lateral accel needed since we're moving laterally
+        _desired_turn_rate_rads = _atc.get_turn_rate_from_heading(_fixed_heading_rad, 0.0f);
+    } else {
+        // Normal mode: vehicle turns to face target and drives forward
+        // rotate acceleration into body frame using current heading
+        const Vector2f accel_target_FR = AP::ahrs().earth_to_body2D(_accel_target);
+
+        // calculate minimum turn speed which is the max speed the vehicle could turn through the corner
+        // given the vehicle's turn radius and half its max lateral acceleration
+        // todo: remove MAX of zero when safe_sqrt fixed
+        float turn_speed_min = MAX(safe_sqrt(_atc.get_turn_lat_accel_max() * 0.5 * _turn_radius), 0);
+
+        // rotate target velocity from earth-frame to body frame
+        const Vector2f vel_target_FR = AP::ahrs().earth_to_body2D(_vel_target);
+
+        // desired speed is normally the forward component (only) of the target velocity
+        float des_speed = vel_target_FR.x;
+        if (!stopping) {
+            // do not let target speed fall below the minimum turn speed unless the vehicle is slowing down
+            const float abs_des_speed_min = MIN(_vel_target.length(), turn_speed_min);
+            if (_reversed != backing_up) {
+                // if reversed or backing up desired speed will be negative
+                des_speed = MIN(-abs_des_speed_min, vel_target_FR.x);
+            } else {
+                des_speed = MAX(abs_des_speed_min, vel_target_FR.x);
+            }
+        }
+        _desired_speed = _atc.get_desired_speed_accel_limited(des_speed, dt);
+
+        // no lateral speed in normal mode
+        _desired_lateral_speed = 0.0f;
+
+        // calculate turn rate from desired lateral acceleration
+        _desired_lat_accel = stopping ? 0 : accel_target_FR.y;
+        _desired_turn_rate_rads = _atc.get_turn_rate_from_lat_accel(_desired_lat_accel, _desired_speed);
+    }
 }
 
 // true if update has been called recently
@@ -266,6 +300,11 @@ bool AR_PosControl::init()
 
     // clear reversed setting
     _reversed = false;
+
+    // clear fixed heading mode
+    _fixed_heading = false;
+    _fixed_heading_rad = 0.0f;
+    _desired_lateral_speed = 0.0f;
 
     // initialise ekf xy reset handler
     init_ekf_xy_reset();

@@ -125,6 +125,11 @@ void AR_WPNav::init(float speed_max)
     _reached_destination = false;
     _fast_waypoint = false;
 
+    // clear fixed heading mode
+    _fixed_heading = false;
+    _fixed_heading_rad = 0.0f;
+    _desired_lateral_speed = 0.0f;
+
     // ensure pivot turns are deactivated
     _pivot.deactivate();
     _pivot_at_next_wp = false;
@@ -147,6 +152,7 @@ void AR_WPNav::update(float dt)
         _desired_speed_limited = _atc.get_desired_speed_accel_limited(0.0f, dt);
         _desired_lat_accel = 0.0f;
         _desired_turn_rate_rads = 0.0f;
+        _desired_lateral_speed = 0.0f;
         _cross_track_error = 0;
         return;
     }
@@ -521,10 +527,12 @@ void AR_WPNav::update_steering_and_speed(const Location &current_loc, float dt)
         _desired_heading_cd = _reversed ? wrap_360_cd(oa_wp_bearing_cd() + 18000) : oa_wp_bearing_cd();
         _desired_turn_rate_rads = is_zero(_desired_speed_limited) ? _pivot.get_turn_rate_rads(_desired_heading_cd * 0.01, dt) : 0;
         _desired_lat_accel = 0.0f;
+        _desired_lateral_speed = 0.0f;
     } else {
         _desired_speed_limited = _pos_control.get_desired_speed();
         _desired_turn_rate_rads = _pos_control.get_desired_turn_rate_rads();
         _desired_lat_accel = _pos_control.get_desired_lat_accel();
+        _desired_lateral_speed = _pos_control.get_desired_lateral_speed();
     }
 }
 
@@ -533,6 +541,23 @@ void AR_WPNav::set_turn_params(float turn_radius, bool pivot_possible)
 {
     _turn_radius = pivot_possible ? 0.0 : turn_radius;
     _pivot.enable(pivot_possible);
+}
+
+// set fixed heading in radians (heading will be maintained while moving laterally to target)
+void AR_WPNav::set_fixed_heading(float heading_rad)
+{
+    _fixed_heading_rad = heading_rad;
+    _fixed_heading = true;
+    // also set on position controller
+    _pos_control.set_fixed_heading(heading_rad);
+}
+
+// clear fixed heading (resume normal heading-to-target behavior)
+void AR_WPNav::clear_fixed_heading()
+{
+    _fixed_heading = false;
+    // also clear on position controller
+    _pos_control.clear_fixed_heading();
 }
 
 // calculate the crosstrack error

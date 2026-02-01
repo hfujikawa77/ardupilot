@@ -53,6 +53,13 @@
 #define AR_ATTCONTROL_HEEL_SAIL_FILT    10.0f
 #define AR_ATTCONTROL_DT                0.02f
 
+// lateral speed control defaults (for omni vehicles)
+#define AR_ATTCONTROL_LAT_SPEED_P       0.20f
+#define AR_ATTCONTROL_LAT_SPEED_I       0.20f
+#define AR_ATTCONTROL_LAT_SPEED_D       0.00f
+#define AR_ATTCONTROL_LAT_SPEED_IMAX    1.00f
+#define AR_ATTCONTROL_LAT_SPEED_FILT    10.00f
+
 // throttle/speed control maximum acceleration/deceleration (in m/s) (_ACCEL_MAX parameter default)
 #define AR_ATTCONTROL_THR_ACCEL_MAX     1.00f
 
@@ -574,6 +581,107 @@ const AP_Param::GroupInfo AR_AttitudeControl::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("_STR_DEC_MAX", 16, AR_AttitudeControl, _steer_decel_max, AR_ATTCONTROL_STEER_DECEL_MAX),
 
+    // @Param: _LAT_P
+    // @DisplayName: Lateral speed control P gain
+    // @Description: Lateral speed control P gain.  Converts the error between the desired lateral speed (in m/s) and actual speed to a motor output (in the range -1 to +1)
+    // @Range: 0.010 2.000
+    // @Increment: 0.01
+    // @User: Standard
+
+    // @Param: _LAT_I
+    // @DisplayName: Lateral speed control I gain
+    // @Description: Lateral speed control I gain.  Corrects long term error between the desired lateral speed (in m/s) and actual speed
+    // @Range: 0.000 2.000
+    // @Increment: 0.01
+    // @User: Standard
+
+    // @Param: _LAT_IMAX
+    // @DisplayName: Lateral speed control I gain maximum
+    // @Description: Lateral speed control I gain maximum.  Constrains the maximum motor output (range -1 to +1) that the I term will generate
+    // @Range: 0.000 1.000
+    // @Increment: 0.01
+    // @User: Standard
+
+    // @Param: _LAT_D
+    // @DisplayName: Lateral speed control D gain
+    // @Description: Lateral speed control D gain.  Compensates for short-term change in desired lateral speed vs actual
+    // @Range: 0.000 0.400
+    // @Increment: 0.001
+    // @User: Standard
+
+    // @Param: _LAT_FF
+    // @DisplayName: Lateral speed control feed forward
+    // @Description: Lateral speed control feed forward
+    // @Range: 0.000 0.500
+    // @Increment: 0.001
+    // @User: Standard
+
+    // @Param: _LAT_FILT
+    // @DisplayName: Lateral speed control filter frequency
+    // @Description: Lateral speed control input filter.  Lower values reduce noise but add delay.
+    // @Range: 0.000 100.000
+    // @Increment: 0.1
+    // @Units: Hz
+    // @User: Standard
+
+    // @Param: _LAT_FLTT
+    // @DisplayName: Lateral speed control Target filter frequency in Hz
+    // @Description: Target filter frequency in Hz
+    // @Range: 0.000 100.000
+    // @Increment: 0.1
+    // @Units: Hz
+    // @User: Standard
+
+    // @Param: _LAT_FLTE
+    // @DisplayName: Lateral speed control Error filter frequency in Hz
+    // @Description: Error filter frequency in Hz
+    // @Range: 0.000 100.000
+    // @Increment: 0.1
+    // @Units: Hz
+    // @User: Standard
+
+    // @Param: _LAT_FLTD
+    // @DisplayName: Lateral speed control Derivative term filter frequency in Hz
+    // @Description: Derivative filter frequency in Hz
+    // @Range: 0.000 100.000
+    // @Increment: 0.1
+    // @Units: Hz
+    // @User: Standard
+
+    // @Param: _LAT_SMAX
+    // @DisplayName: Lateral speed control slew rate limit
+    // @Description: Sets an upper limit on the slew rate produced by the combined P and D gains. If the amplitude of the control action produced by the rate feedback exceeds this value, then the D+P gain is reduced to respect the limit. This limits the amplitude of high frequency oscillations caused by an excessive gain. The limit should be set to no more than 25% of the actuators maximum slew rate to allow for load effects. Note: The gain will not be reduced to less than 10% of the nominal value. A value of zero will disable this feature.
+    // @Range: 0 200
+    // @Increment: 0.5
+    // @User: Advanced
+
+    // @Param: _LAT_PDMX
+    // @DisplayName: Lateral speed control PD sum maximum
+    // @Description: Lateral speed control PD sum maximum.  The maximum/minimum value that the sum of the P and D term can output
+    // @Range: 0.000 1.000
+    // @Increment: 0.01
+
+    // @Param: _LAT_D_FF
+    // @DisplayName: Lateral speed control Derivative FeedForward Gain
+    // @Description: FF D Gain which produces an output that is proportional to the rate of change of the target
+    // @Range: 0 0.03
+    // @Increment: 0.001
+    // @User: Advanced
+
+    // @Param: _LAT_NTF
+    // @DisplayName: Lateral speed control Target notch filter index
+    // @Description: Lateral speed control Target notch filter index
+    // @Range: 1 8
+    // @User: Advanced
+
+    // @Param: _LAT_NEF
+    // @DisplayName: Lateral speed control Error notch filter index
+    // @Description: Lateral speed control Error notch filter index
+    // @Range: 1 8
+    // @User: Advanced
+
+    AP_SUBGROUPINFO(_lateral_speed_pid, "_LAT_", 17, AR_AttitudeControl, AC_PID),
+
     AP_GROUPEND
 };
 
@@ -582,7 +690,8 @@ AR_AttitudeControl::AR_AttitudeControl() :
     _steer_rate_pid(AR_ATTCONTROL_STEER_RATE_P, AR_ATTCONTROL_STEER_RATE_I, AR_ATTCONTROL_STEER_RATE_D, AR_ATTCONTROL_STEER_RATE_FF, AR_ATTCONTROL_STEER_RATE_IMAX, 0.0f, AR_ATTCONTROL_STEER_RATE_FILT, 0.0f),
     _throttle_speed_pid(AR_ATTCONTROL_THR_SPEED_P, AR_ATTCONTROL_THR_SPEED_I, AR_ATTCONTROL_THR_SPEED_D, 0.0f, AR_ATTCONTROL_THR_SPEED_IMAX, 0.0f, AR_ATTCONTROL_THR_SPEED_FILT, 0.0f),
     _pitch_to_throttle_pid(AR_ATTCONTROL_PITCH_THR_P, AR_ATTCONTROL_PITCH_THR_I, AR_ATTCONTROL_PITCH_THR_D, 0.0f, AR_ATTCONTROL_PITCH_THR_IMAX, 0.0f, AR_ATTCONTROL_PITCH_THR_FILT, 0.0f),
-    _sailboat_heel_pid(AR_ATTCONTROL_HEEL_SAIL_P, AR_ATTCONTROL_HEEL_SAIL_I, AR_ATTCONTROL_HEEL_SAIL_D, 0.0f, AR_ATTCONTROL_HEEL_SAIL_IMAX, 0.0f, AR_ATTCONTROL_HEEL_SAIL_FILT, 0.0f)
+    _sailboat_heel_pid(AR_ATTCONTROL_HEEL_SAIL_P, AR_ATTCONTROL_HEEL_SAIL_I, AR_ATTCONTROL_HEEL_SAIL_D, 0.0f, AR_ATTCONTROL_HEEL_SAIL_IMAX, 0.0f, AR_ATTCONTROL_HEEL_SAIL_FILT, 0.0f),
+    _lateral_speed_pid(AR_ATTCONTROL_LAT_SPEED_P, AR_ATTCONTROL_LAT_SPEED_I, AR_ATTCONTROL_LAT_SPEED_D, 0.0f, AR_ATTCONTROL_LAT_SPEED_IMAX, 0.0f, AR_ATTCONTROL_LAT_SPEED_FILT, 0.0f)
 {
     _singleton = this;
     AP_Param::setup_object_defaults(this, var_info);
@@ -1009,6 +1118,128 @@ bool AR_AttitudeControl::get_forward_speed(float &speed) const
     return true;
 }
 
+// get lateral speed in m/s (earth-frame horizontal velocity but only along vehicle y-axis).  returns true on success
+// positive lateral speed is to the right
+bool AR_AttitudeControl::get_lateral_speed(float &speed) const
+{
+    Vector3f velocity;
+    const AP_AHRS &_ahrs = AP::ahrs();
+    if (!_ahrs.get_velocity_NED(velocity)) {
+        // cannot get velocity estimate, return false
+        return false;
+    }
+    // calculate lateral speed velocity into body frame
+    // lateral speed is positive to the right (y-axis in body frame)
+    speed = -velocity.x*_ahrs.sin_yaw() + velocity.y*_ahrs.cos_yaw();
+    return true;
+}
+
+// return a lateral output from -1 to +1 given a desired lateral speed in m/s
+// positive lateral speed is to the right
+float AR_AttitudeControl::get_lateral_out_speed(float desired_lateral_speed, bool motor_limit_low, bool motor_limit_high, float dt)
+{
+    // sanity check dt
+    dt = constrain_float(dt, 0.0f, 1.0f);
+
+    // get lateral speed
+    float speed;
+    if (!get_lateral_speed(speed)) {
+        // we expect caller will not try to control lateral speed without a valid speed estimate
+        // on failure to get speed we do not attempt to control
+        return 0.0f;
+    }
+
+    // if not called recently, reset input filter and desired lateral speed to actual speed (used for accel limiting)
+    if (!lateral_speed_control_active()) {
+        _lateral_speed_pid.reset_filter();
+        _lateral_speed_pid.reset_I();
+        _desired_lateral_speed = speed;
+    }
+    _lateral_speed_last_ms = AP_HAL::millis();
+
+    // acceleration limit desired lateral speed
+    _desired_lateral_speed = get_desired_lateral_speed_accel_limited(desired_lateral_speed, dt);
+
+    // calculate base output using cruise speed and throttle as a proxy for lateral movement
+    // we use the same cruise speed/throttle for lateral as we do for forward movement
+    float lateral_base = 0.0f;
+
+    // calculate final output
+    float lateral_out = _lateral_speed_pid.update_all(_desired_lateral_speed, speed, dt, (motor_limit_low || motor_limit_high || _lateral_limit_low || _lateral_limit_high));
+    lateral_out += _lateral_speed_pid.get_ff();
+    lateral_out += lateral_base;
+
+    // update PID info for reporting purposes
+    _lateral_speed_pid_info = _lateral_speed_pid.get_pid_info();
+
+    // clear local limit flags used to stop i-term build-up
+    _lateral_limit_low = false;
+    _lateral_limit_high = false;
+
+    // constrain output to -1 to +1
+    if (lateral_out < -1.0f) {
+        lateral_out = -1.0f;
+        _lateral_limit_low = true;
+    }
+    if (lateral_out > 1.0f) {
+        lateral_out = 1.0f;
+        _lateral_limit_high = true;
+    }
+
+    // final output lateral in range -1 to 1
+    return lateral_out;
+}
+
+// check if lateral speed controller active
+bool AR_AttitudeControl::lateral_speed_control_active() const
+{
+    // active if there have been recent calls to lateral speed controller
+    if ((_lateral_speed_last_ms == 0) || ((AP_HAL::millis() - _lateral_speed_last_ms) > AR_ATTCONTROL_TIMEOUT_MS)) {
+        return false;
+    }
+    return true;
+}
+
+// get latest desired lateral speed recorded during call to get_lateral_out_speed.  For reporting purposes only
+float AR_AttitudeControl::get_desired_lateral_speed() const
+{
+    // return zero if no recent calls to lateral speed controller
+    if (!lateral_speed_control_active()) {
+        return 0.0f;
+    }
+    return _desired_lateral_speed;
+}
+
+// get acceleration limited desired lateral speed
+float AR_AttitudeControl::get_desired_lateral_speed_accel_limited(float desired_lateral_speed, float dt) const
+{
+    // return input value if no recent calls to lateral speed controller
+    // apply no limiting when ATC_ACCEL_MAX is set to zero
+    if (!lateral_speed_control_active() || !is_positive(_throttle_accel_max)) {
+        return desired_lateral_speed;
+    }
+
+    // sanity check dt
+    dt = constrain_float(dt, 0.0f, 1.0f);
+
+    // use previous desired lateral speed as basis for accel limiting
+    float speed_prev = _desired_lateral_speed;
+
+    // if no recent calls to lateral speed controller limit based on current lateral speed
+    if (!lateral_speed_control_active()) {
+        get_lateral_speed(speed_prev);
+    }
+
+    // acceleration limit desired lateral speed (use same accel/decel limits as forward/back)
+    float speed_change_max;
+    if (fabsf(desired_lateral_speed) < fabsf(_desired_lateral_speed) && is_positive(_throttle_decel_max)) {
+        speed_change_max = _throttle_decel_max * dt;
+    } else {
+        speed_change_max = _throttle_accel_max * dt;
+    }
+    return constrain_float(desired_lateral_speed, speed_prev - speed_change_max, speed_prev + speed_change_max);
+}
+
 float AR_AttitudeControl::get_decel_max() const
 {
     if (is_positive(_throttle_decel_max)) {
@@ -1082,12 +1313,13 @@ float AR_AttitudeControl::get_stopping_distance(float speed) const
     return 0.5f * sq(speed) / decel_max;
 }
 
-// relax I terms of throttle and steering controllers
+// relax I terms of throttle, steering, and lateral controllers
 void AR_AttitudeControl::relax_I()
 {
     _steer_rate_pid.reset_I();
     _throttle_speed_pid.reset_I();
     _pitch_to_throttle_pid.reset_I();
+    _lateral_speed_pid.reset_I();
 }
 
 void AR_AttitudeControl::set_notch_sample_rate(float sample_rate)
@@ -1096,5 +1328,6 @@ void AR_AttitudeControl::set_notch_sample_rate(float sample_rate)
     _steer_rate_pid.set_notch_sample_rate(sample_rate);
     _throttle_speed_pid.set_notch_sample_rate(sample_rate);
     _pitch_to_throttle_pid.set_notch_sample_rate(sample_rate);
+    _lateral_speed_pid.set_notch_sample_rate(sample_rate);
 #endif
 }
