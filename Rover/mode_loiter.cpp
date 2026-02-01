@@ -70,6 +70,9 @@ void ModeLoiter::update()
     // run steering and throttle controllers
     calc_steering_to_heading(_desired_yaw_cd, turn_rate);
     calc_throttle(_desired_speed, true);
+
+    // clear lateral output in Loiter mode (lateral loiter not yet supported)
+    g2.motors.set_lateral(0.0f);
 }
 
 // get desired location

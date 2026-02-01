@@ -445,3 +445,23 @@ bool ModeGuided::use_scurves_for_navigation() const
 {
     return ((g2.guided_options.get() & uint32_t(Options::SCurvesUsedForNavigation)) != 0);
 }
+
+// set fixed heading for omni vehicles (for lateral movement to target while maintaining heading)
+void ModeGuided::set_fixed_heading(float heading_deg)
+{
+    // only applicable to omni vehicles
+    if (!g2.motors.is_omni()) {
+        return;
+    }
+
+    // set fixed heading on waypoint navigator
+    g2.wp_nav.set_fixed_heading(radians(heading_deg));
+
+    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Guided: fixed heading %.1f deg", static_cast<double>(heading_deg));
+}
+
+// clear fixed heading (resume normal heading-to-target behavior)
+void ModeGuided::clear_fixed_heading()
+{
+    g2.wp_nav.clear_fixed_heading();
+}
