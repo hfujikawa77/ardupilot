@@ -819,6 +819,13 @@ void GCS_MAVLINK_Rover::handle_set_position_target_local_ned(const mavlink_messa
             // GCS will need to monitor desired location to
             // see if they are having an effect.
         }
+        if (rover.g2.motors.is_omni() &&
+            ((rover.g2.guided_options.get() & uint32_t(ModeGuided::Options::FixedHeadingForPositionTargets)) != 0)) {
+            const float fixed_heading_deg = yaw_ignore ?
+                (wrap_360_cd(rover.ahrs.yaw_sensor) * 0.01f) :
+                (wrap_360_cd(target_yaw_cd) * 0.01f);
+            rover.mode_guided.set_fixed_heading(fixed_heading_deg);
+        }
         return;
     }
 
@@ -928,6 +935,13 @@ void GCS_MAVLINK_Rover::handle_set_position_target_global_int(const mavlink_mess
         if (!rover.mode_guided.set_desired_location(target_loc)) {
             // GCS will just need to look at desired location
             // outputs to see if it having an effect.
+        }
+        if (rover.g2.motors.is_omni() &&
+            ((rover.g2.guided_options.get() & uint32_t(ModeGuided::Options::FixedHeadingForPositionTargets)) != 0)) {
+            const float fixed_heading_deg = yaw_ignore ?
+                (wrap_360_cd(rover.ahrs.yaw_sensor) * 0.01f) :
+                (wrap_360_cd(target_yaw_cd) * 0.01f);
+            rover.mode_guided.set_fixed_heading(fixed_heading_deg);
         }
         return;
     }

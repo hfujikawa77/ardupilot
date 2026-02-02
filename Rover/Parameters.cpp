@@ -596,7 +596,7 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @Param: GUID_OPTIONS
     // @DisplayName: Guided mode options
     // @Description: Options that can be applied to change guided mode behaviour
-    // @Bitmask: 6:SCurves used for navigation
+    // @Bitmask: 6:SCurves used for navigation,7:Fixed heading for guided position targets (omni only)
     // @User: Advanced
     AP_GROUPINFO("GUID_OPTIONS", 52, ParametersG2, guided_options, 0),
 

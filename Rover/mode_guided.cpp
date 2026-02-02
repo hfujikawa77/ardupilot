@@ -35,6 +35,11 @@ void ModeGuided::update()
                     rover.gcs().send_mission_item_reached_message(0);
                 }
 
+                // clear fixed heading/lateral control to prevent drift after arrival
+                g2.wp_nav.clear_fixed_heading();
+                g2.motors.set_lateral(0.0f);
+                attitude_control.relax_I();
+
                 // we have reached the destination so stay here
                 if (rover.is_boat()) {
                     if (!start_loiter()) {

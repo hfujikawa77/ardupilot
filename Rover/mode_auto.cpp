@@ -614,6 +614,11 @@ void ModeAuto::exit_mission()
     // send message
     GCS_SEND_TEXT(MAV_SEVERITY_NOTICE, "Mission Complete");
 
+    // clear fixed heading/lateral control so omni vehicles do not drift after mission completion
+    g2.wp_nav.clear_fixed_heading();
+    g2.motors.set_lateral(0.0f);
+    attitude_control.relax_I();
+
     switch ((DoneBehaviour)g2.mis_done_behave) {
     case DoneBehaviour::HOLD:
         // the default "start_stop" behaviour is used

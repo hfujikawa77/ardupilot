@@ -566,6 +566,12 @@ public:
     void set_fixed_heading(float heading_deg);
     void clear_fixed_heading();
 
+    // enum for GUID_OPTIONS parameter
+    enum class Options : int32_t {
+        SCurvesUsedForNavigation = (1U << 6),
+        FixedHeadingForPositionTargets = (1U << 7)
+    };
+
     // vehicle start loiter
     bool start_loiter();
 
@@ -587,11 +593,6 @@ protected:
         Loiter,
         SteeringAndThrottle,
         Stop
-    };
-
-    // enum for GUID_OPTIONS parameter
-    enum class Options : int32_t {
-        SCurvesUsedForNavigation = (1U << 6)
     };
 
     bool _enter() override;
