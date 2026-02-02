@@ -1034,7 +1034,21 @@ void GCS_MAVLINK_Rover::handle_set_position_target_local_ned(const mavlink_messa
             // GCS will need to monitor desired location to
             // see if they are having an effect.
         }
+<<<<<<< HEAD:Rover/GCS_Mavlink.cpp
     } else if (!vel_ignore && acc_ignore && yaw_ignore && yaw_rate_ignore) {
+=======
+        if (rover.g2.motors.is_omni() &&
+            ((rover.g2.guided_options.get() & uint32_t(ModeGuided::Options::FixedHeadingForPositionTargets)) != 0)) {
+            const float fixed_heading_deg = yaw_ignore ?
+                (wrap_360_cd(rover.ahrs.yaw_sensor) * 0.01f) :
+                (wrap_360_cd(target_yaw_cd) * 0.01f);
+            rover.mode_guided.set_fixed_heading(fixed_heading_deg);
+        }
+        return;
+    }
+
+    if (!vel_ignore && yaw_ignore && yaw_rate_ignore) {
+>>>>>>> 5222de682f (Rover: add GUID_OPTIONS bit7 for fixed heading in Guided position targets):Rover/GCS_MAVLink_Rover.cpp
         // consume velocity
         rover.mode_guided.set_desired_heading_and_speed(target_yaw_cd, speed_dir * target_speed);
     } else if (!vel_ignore && acc_ignore && yaw_ignore && !yaw_rate_ignore) {
@@ -1135,7 +1149,21 @@ void GCS_MAVLINK_Rover::handle_set_position_target_global_int(const mavlink_mess
             // GCS will just need to look at desired location
             // outputs to see if it having an effect.
         }
+<<<<<<< HEAD:Rover/GCS_Mavlink.cpp
     } else if (!vel_ignore && acc_ignore && yaw_ignore && yaw_rate_ignore) {
+=======
+        if (rover.g2.motors.is_omni() &&
+            ((rover.g2.guided_options.get() & uint32_t(ModeGuided::Options::FixedHeadingForPositionTargets)) != 0)) {
+            const float fixed_heading_deg = yaw_ignore ?
+                (wrap_360_cd(rover.ahrs.yaw_sensor) * 0.01f) :
+                (wrap_360_cd(target_yaw_cd) * 0.01f);
+            rover.mode_guided.set_fixed_heading(fixed_heading_deg);
+        }
+        return;
+    }
+
+    if (!vel_ignore && yaw_ignore && yaw_rate_ignore) {
+>>>>>>> 5222de682f (Rover: add GUID_OPTIONS bit7 for fixed heading in Guided position targets):Rover/GCS_MAVLink_Rover.cpp
         // consume velocity
         rover.mode_guided.set_desired_heading_and_speed(target_yaw_cd, speed_dir * target_speed);
     } else if (!vel_ignore && acc_ignore && yaw_ignore && !yaw_rate_ignore) {
