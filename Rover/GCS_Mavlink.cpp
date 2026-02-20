@@ -474,7 +474,20 @@ bool GCS_MAVLINK_Rover::handle_guided_request(AP_Mission::Mission_Command &cmd)
     }
 
     // make any new wp uploaded instant (in case we are already in Guided mode)
-    return rover.mode_guided.set_desired_location(cmd.content.location);
+    if (!rover.mode_guided.set_desired_location(cmd.content.location)) {
+        return false;
+    }
+
+    // For omni vehicles, optionally hold current heading for guided mission-item
+    // requests (MISSION_ITEM with current=2). Mission_Command does not preserve
+    // NAV_WAYPOINT param4 yaw, so this mirrors yaw-ignore behavior.
+    if (rover.g2.motors.is_omni() &&
+        ((rover.g2.guided_options.get() & uint32_t(ModeGuided::Options::FixedHeadingForPositionTargets)) != 0)) {
+        const float fixed_heading_deg = wrap_360_cd(rover.ahrs.yaw_sensor) * 0.01f;
+        rover.mode_guided.set_fixed_heading(fixed_heading_deg);
+    }
+
+    return true;
 }
 
 MAV_RESULT GCS_MAVLINK_Rover::_handle_command_preflight_calibration(const mavlink_command_int_t &packet, const mavlink_message_t &msg)
@@ -629,6 +642,16 @@ MAV_RESULT GCS_MAVLINK_Rover::handle_command_int_do_reposition(const mavlink_com
     // set the destination
     if (!rover.mode_guided.set_desired_location(requested_location)) {
         return MAV_RESULT_FAILED;
+    }
+
+    // For omni vehicles, optionally hold heading for GUIDED position targets
+    // so lateral motion can be used while moving to the reposition target.
+    if (rover.g2.motors.is_omni() &&
+        ((rover.g2.guided_options.get() & uint32_t(ModeGuided::Options::FixedHeadingForPositionTargets)) != 0)) {
+        const float fixed_heading_deg = isfinite(packet.param4) ?
+            wrap_360(packet.param4) :
+            (wrap_360_cd(rover.ahrs.yaw_sensor) * 0.01f);
+        rover.mode_guided.set_fixed_heading(fixed_heading_deg);
     }
 
     return MAV_RESULT_ACCEPTED;
