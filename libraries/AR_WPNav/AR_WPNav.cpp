@@ -168,6 +168,11 @@ void AR_WPNav::update(float dt)
     // handle change in max speed
     update_speed_max();
 
+    // fixed heading mode uses lateral movement instead of pivot turns
+    if (_fixed_heading && _pivot.active()) {
+        _pivot.deactivate();
+    }
+
     // advance target along path unless vehicle is pivoting
     if (!_pivot.active()) {
         switch (_nav_control_type) {
@@ -479,6 +484,10 @@ void AR_WPNav::update_psc_input_shaping(float dt)
 
     // initialise position controller if not called recently
     init_pos_control_if_necessary();
+    // PosControl::init() clears fixed heading, so re-apply WPNav's setting.
+    if (_fixed_heading) {
+        _pos_control.set_fixed_heading(_fixed_heading_rad);
+    }
 
     // convert to meters and update target
     const Vector2p pos_target = pos_target_cm.topostype() * 0.01;
@@ -546,6 +555,8 @@ void AR_WPNav::set_fixed_heading(float heading_rad)
     _fixed_heading = true;
     // also set on position controller
     _pos_control.set_fixed_heading(heading_rad);
+    // deactivate pivot turns because fixed heading mode uses lateral movement instead
+    _pivot.deactivate();
 }
 
 // clear fixed heading (resume normal heading-to-target behavior)
@@ -609,6 +620,10 @@ void AR_WPNav::init_pos_control_if_necessary()
             // this should never fail because we should always have a valid position estimate at this point
             INTERNAL_ERROR(AP_InternalError::error_t::flow_of_control);
             return;
+        }
+        // re-apply fixed heading after init because init() resets _fixed_heading to false
+        if (_fixed_heading) {
+            _pos_control.set_fixed_heading(_fixed_heading_rad);
         }
     }
 }

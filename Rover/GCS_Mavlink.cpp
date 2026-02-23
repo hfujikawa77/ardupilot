@@ -1,6 +1,6 @@
 #include "Rover.h"
 
-#include "GCS_MAVLink_Rover.h"
+#include "GCS_Mavlink.h"
 
 #include <AP_RPM/AP_RPM_config.h>
 #include <AP_RangeFinder/AP_RangeFinder_Backend.h>
@@ -15,7 +15,7 @@ MAV_TYPE GCS_Rover::frame_type() const
     return MAV_TYPE_GROUND_ROVER;
 }
 
-uint8_t GCS_MAVLINK_Rover::base_mode() const
+MAV_MODE GCS_MAVLINK_Rover::base_mode() const
 {
     uint8_t _base_mode = MAV_MODE_FLAG_CUSTOM_MODE_ENABLED;
 
@@ -49,7 +49,7 @@ uint8_t GCS_MAVLINK_Rover::base_mode() const
     // indicate we have set a custom mode
     _base_mode |= MAV_MODE_FLAG_CUSTOM_MODE_ENABLED;
 
-    return _base_mode;
+    return (MAV_MODE)_base_mode;
 }
 
 uint32_t GCS_Rover::custom_mode() const
@@ -155,7 +155,7 @@ int16_t GCS_MAVLINK_Rover::vfr_hud_throttle() const
     return rover.g2.motors.get_throttle();
 }
 
-#if AP_MAVLINK_MSG_RANGEFINDER_SENDING_ENABLED
+#if AP_RANGEFINDER_ENABLED
 void GCS_MAVLINK_Rover::send_rangefinder() const
 {
     float distance = 0;
@@ -185,7 +185,7 @@ void GCS_MAVLINK_Rover::send_rangefinder() const
         distance,
         voltage);
 }
-#endif  // AP_MAVLINK_MSG_RANGEFINDER_SENDING_ENABLED
+#endif  // AP_RANGEFINDER_ENABLED
 
 #if AP_RANGEFINDER_ENABLED
 void GCS_MAVLINK_Rover::send_water_depth()
@@ -244,9 +244,9 @@ void GCS_MAVLINK_Rover::send_water_depth()
             loc.lat,            // latitude of vehicle
             loc.lng,            // longitude of vehicle
             loc.alt * 0.01f,    // altitude of vehicle (MSL)
-            ahrs.get_roll_rad(),    // roll in radians
-            ahrs.get_pitch_rad(),   // pitch in radians
-            ahrs.get_yaw_rad(),     // yaw in radians
+            ahrs.get_roll(),    // roll in radians
+            ahrs.get_pitch(),   // pitch in radians
+            ahrs.get_yaw(),     // yaw in radians
             s->distance(),    // distance in meters
             temp_C);            // temperature in degC
 
@@ -415,6 +415,21 @@ void Rover::send_wheel_encoder_distance(const mavlink_channel_t chan)
     }
 }
 
+uint8_t GCS_MAVLINK_Rover::sysid_my_gcs() const
+{
+    return rover.g.sysid_my_gcs;
+}
+
+bool GCS_MAVLINK_Rover::sysid_enforce() const
+{
+    return rover.g2.sysid_enforce;
+}
+
+uint32_t GCS_MAVLINK_Rover::telem_delay() const
+{
+    return static_cast<uint32_t>(rover.g.telem_delay);
+}
+
 bool GCS_Rover::vehicle_initialised() const
 {
     return rover.control_mode != &rover.mode_initializing;
@@ -466,6 +481,238 @@ bool GCS_MAVLINK_Rover::try_send_message(enum ap_message id)
     }
     return true;
 }
+
+void GCS_MAVLINK_Rover::packetReceived(const mavlink_status_t &status, const mavlink_message_t &msg)
+{
+#if AP_FOLLOW_ENABLED
+    // pass message to follow library
+    rover.g2.follow.handle_msg(msg);
+#endif
+    GCS_MAVLINK::packetReceived(status, msg);
+}
+
+/*
+  default stream rates to 1Hz
+ */
+const AP_Param::GroupInfo GCS_MAVLINK_Parameters::var_info[] = {
+    // @Param: RAW_SENS
+    // @DisplayName: Raw sensor stream rate
+    // @Description: MAVLink Stream rate of RAW_IMU, SCALED_IMU2, SCALED_IMU3, SCALED_PRESSURE, SCALED_PRESSURE2, SCALED_PRESSURE3 and AIRSPEED
+    // @Units: Hz
+    // @Range: 0 50
+    // @Increment: 1
+    // @RebootRequired: True
+    // @User: Advanced
+    AP_GROUPINFO("RAW_SENS", 0, GCS_MAVLINK_Parameters, streamRates[0],  1),
+
+    // @Param: EXT_STAT
+    // @DisplayName: Extended status stream rate
+    // @Description: MAVLink Stream rate of SYS_STATUS, POWER_STATUS, MCU_STATUS, MEMINFO, CURRENT_WAYPOINT, GPS_RAW_INT, GPS_RTK (if available), GPS2_RAW_INT (if available), GPS2_RTK (if available), NAV_CONTROLLER_OUTPUT, FENCE_STATUS, and GLOBAL_TARGET_POS_INT
+    // @Units: Hz
+    // @Range: 0 50
+    // @Increment: 1
+    // @RebootRequired: True
+    // @User: Advanced
+    AP_GROUPINFO("EXT_STAT", 1, GCS_MAVLINK_Parameters, streamRates[1],  1),
+
+    // @Param: RC_CHAN
+    // @DisplayName: RC Channel stream rate
+    // @Description: MAVLink Stream rate of SERVO_OUTPUT_RAW and RC_CHANNELS
+    // @Units: Hz
+    // @Range: 0 50
+    // @Increment: 1
+    // @RebootRequired: True
+    // @User: Advanced
+    AP_GROUPINFO("RC_CHAN",  2, GCS_MAVLINK_Parameters, streamRates[2],  1),
+
+    // @Param: RAW_CTRL
+    // @DisplayName: Raw Control stream rate
+    // @Description: MAVLink Raw Control stream rate of SERVO_OUT
+    // @Units: Hz
+    // @Range: 0 50
+    // @Increment: 1
+    // @RebootRequired: True
+    // @User: Advanced
+    AP_GROUPINFO("RAW_CTRL", 3, GCS_MAVLINK_Parameters, streamRates[3],  1),
+
+    // @Param: POSITION
+    // @DisplayName: Position stream rate
+    // @Description: MAVLink Stream rate of GLOBAL_POSITION_INT and LOCAL_POSITION_NED
+    // @Units: Hz
+    // @Range: 0 50
+    // @Increment: 1
+    // @RebootRequired: True
+    // @User: Advanced
+    AP_GROUPINFO("POSITION", 4, GCS_MAVLINK_Parameters, streamRates[4],  1),
+
+    // @Param: EXTRA1
+    // @DisplayName: Extra data type 1 stream rate to ground station
+    // @Description: MAVLink Stream rate of ATTITUDE, SIMSTATE (SIM only), AHRS2 and PID_TUNING
+    // @Units: Hz
+    // @Range: 0 50
+    // @Increment: 1
+    // @RebootRequired: True
+    // @User: Advanced
+    AP_GROUPINFO("EXTRA1",   5, GCS_MAVLINK_Parameters, streamRates[5],  1),
+
+    // @Param: EXTRA2
+    // @DisplayName: Extra data type 2 stream rate
+    // @Description: MAVLink Stream rate of VFR_HUD
+    // @Units: Hz
+    // @Range: 0 50
+    // @Increment: 1
+    // @RebootRequired: True
+    // @User: Advanced
+    AP_GROUPINFO("EXTRA2",   6, GCS_MAVLINK_Parameters, streamRates[6],  1),
+
+    // @Param: EXTRA3
+    // @DisplayName: Extra data type 3 stream rate
+    // @Description: MAVLink Stream rate of AHRS, SYSTEM_TIME, WIND, RANGEFINDER, DISTANCE_SENSOR, BATTERY2, BATTERY_STATUS, GIMBAL_DEVICE_ATTITUDE_STATUS, OPTICAL_FLOW, MAG_CAL_REPORT, MAG_CAL_PROGRESS, EKF_STATUS_REPORT, VIBRATION, RPM, ESC TELEMETRY, and WHEEL_DISTANCE
+    // @Units: Hz
+    // @Range: 0 50
+    // @Increment: 1
+    // @RebootRequired: True
+    // @User: Advanced
+    AP_GROUPINFO("EXTRA3",   7, GCS_MAVLINK_Parameters, streamRates[7],  1),
+
+    // @Param: PARAMS
+    // @DisplayName: Parameter stream rate
+    // @Description: MAVLink Stream rate of PARAM_VALUE
+    // @Units: Hz
+    // @Range: 0 50
+    // @Increment: 1
+    // @RebootRequired: True
+    // @User: Advanced
+    AP_GROUPINFO("PARAMS",   8, GCS_MAVLINK_Parameters, streamRates[8],  10),
+
+    // @Param: ADSB
+    // @DisplayName: ADSB stream rate
+    // @Description: MAVLink ADSB (AIS) stream rate
+    // @Units: Hz
+    // @Range: 0 50
+    // @Increment: 1
+    // @RebootRequired: True
+    // @User: Advanced
+    AP_GROUPINFO("ADSB",   9, GCS_MAVLINK_Parameters, streamRates[9],  0),
+
+    AP_GROUPEND
+};
+
+static const ap_message STREAM_RAW_SENSORS_msgs[] = {
+    MSG_RAW_IMU,
+    MSG_SCALED_IMU2,
+    MSG_SCALED_IMU3,
+    MSG_SCALED_PRESSURE,
+    MSG_SCALED_PRESSURE2,
+    MSG_SCALED_PRESSURE3,
+#if AP_AIRSPEED_ENABLED
+    MSG_AIRSPEED,
+#endif
+};
+static const ap_message STREAM_EXTENDED_STATUS_msgs[] = {
+    MSG_SYS_STATUS,
+    MSG_POWER_STATUS,
+#if HAL_WITH_MCU_MONITORING
+    MSG_MCU_STATUS,
+#endif
+    MSG_MEMINFO,
+    MSG_CURRENT_WAYPOINT,
+    MSG_GPS_RAW,
+    MSG_GPS_RTK,
+#if GPS_MAX_RECEIVERS > 1
+    MSG_GPS2_RAW,
+    MSG_GPS2_RTK,
+#endif
+    MSG_NAV_CONTROLLER_OUTPUT,
+#if AP_FENCE_ENABLED
+    MSG_FENCE_STATUS,
+#endif
+    MSG_POSITION_TARGET_GLOBAL_INT,
+};
+static const ap_message STREAM_POSITION_msgs[] = {
+    MSG_LOCATION,
+    MSG_LOCAL_POSITION
+};
+static const ap_message STREAM_RAW_CONTROLLER_msgs[] = {
+    MSG_SERVO_OUT,
+};
+static const ap_message STREAM_RC_CHANNELS_msgs[] = {
+    MSG_SERVO_OUTPUT_RAW,
+    MSG_RC_CHANNELS,
+#if AP_MAVLINK_MSG_RC_CHANNELS_RAW_ENABLED
+    MSG_RC_CHANNELS_RAW, // only sent on a mavlink1 connection
+#endif
+};
+static const ap_message STREAM_EXTRA1_msgs[] = {
+    MSG_ATTITUDE,
+#if AP_SIM_ENABLED
+    MSG_SIMSTATE,
+#endif
+    MSG_AHRS2,
+    MSG_PID_TUNING,
+};
+static const ap_message STREAM_EXTRA2_msgs[] = {
+    MSG_VFR_HUD
+};
+static const ap_message STREAM_EXTRA3_msgs[] = {
+    MSG_AHRS,
+    MSG_WIND,
+#if AP_RANGEFINDER_ENABLED
+    MSG_RANGEFINDER,
+    MSG_WATER_DEPTH,
+#endif
+    MSG_DISTANCE_SENSOR,
+    MSG_SYSTEM_TIME,
+#if AP_BATTERY_ENABLED
+    MSG_BATTERY_STATUS,
+#endif
+#if HAL_MOUNT_ENABLED
+    MSG_GIMBAL_DEVICE_ATTITUDE_STATUS,
+#endif
+#if AP_OPTICALFLOW_ENABLED
+    MSG_OPTICAL_FLOW,
+#endif
+#if COMPASS_CAL_ENABLED
+    MSG_MAG_CAL_REPORT,
+    MSG_MAG_CAL_PROGRESS,
+#endif
+    MSG_EKF_STATUS_REPORT,
+    MSG_VIBRATION,
+#if AP_RPM_ENABLED
+    MSG_RPM,
+#endif
+    MSG_WHEEL_DISTANCE,
+#if HAL_WITH_ESC_TELEM
+    MSG_ESC_TELEMETRY,
+#endif
+#if HAL_EFI_ENABLED
+    MSG_EFI_STATUS,
+#endif
+};
+static const ap_message STREAM_PARAMS_msgs[] = {
+    MSG_NEXT_PARAM
+};
+static const ap_message STREAM_ADSB_msgs[] = {
+    MSG_ADSB_VEHICLE,
+#if AP_AIS_ENABLED
+    MSG_AIS_VESSEL,
+#endif
+};
+
+const struct GCS_MAVLINK::stream_entries GCS_MAVLINK::all_stream_entries[] = {
+    MAV_STREAM_ENTRY(STREAM_RAW_SENSORS),
+    MAV_STREAM_ENTRY(STREAM_EXTENDED_STATUS),
+    MAV_STREAM_ENTRY(STREAM_POSITION),
+    MAV_STREAM_ENTRY(STREAM_RAW_CONTROLLER),
+    MAV_STREAM_ENTRY(STREAM_RC_CHANNELS),
+    MAV_STREAM_ENTRY(STREAM_EXTRA1),
+    MAV_STREAM_ENTRY(STREAM_EXTRA2),
+    MAV_STREAM_ENTRY(STREAM_EXTRA3),
+    MAV_STREAM_ENTRY(STREAM_ADSB),
+    MAV_STREAM_ENTRY(STREAM_PARAMS),
+    MAV_STREAM_TERMINATOR // must have this at end of stream_entries
+};
+
 bool GCS_MAVLINK_Rover::handle_guided_request(AP_Mission::Mission_Command &cmd)
 {
     if (!rover.control_mode->in_guided_mode()) {
@@ -1058,53 +1305,3 @@ uint8_t GCS_MAVLINK_Rover::high_latency_wind_direction() const
 }
 #endif // HAL_HIGH_LATENCY2_ENABLED
 
-// Send the mode with the given index (not mode number!) return the total number of modes
-// Index starts at 1
-uint8_t GCS_MAVLINK_Rover::send_available_mode(uint8_t index) const
-{
-    const Mode* modes[] {
-        &rover.mode_manual,
-        &rover.mode_acro,
-        &rover.mode_steering,
-        &rover.mode_hold,
-        &rover.mode_loiter,
-#if MODE_FOLLOW_ENABLED
-        &rover.mode_follow,
-#endif
-        &rover.mode_simple,
-        &rover.g2.mode_circle,
-        &rover.mode_auto,
-        &rover.mode_rtl,
-        &rover.mode_smartrtl,
-        &rover.mode_guided,
-        &rover.mode_initializing,
-#if MODE_DOCK_ENABLED
-        (Mode *)rover.g2.mode_dock_ptr,
-#endif
-    };
-
-    const uint8_t mode_count = ARRAY_SIZE(modes);
-
-    // Convert to zero indexed
-    const uint8_t index_zero = index - 1;
-    if (index_zero >= mode_count) {
-        // Mode does not exist!?
-        return mode_count;
-    }
-
-    // Ask the mode for its name and number
-    const char* name = modes[index_zero]->name();
-    const uint8_t mode_number = (uint8_t)modes[index_zero]->mode_number();
-
-    mavlink_msg_available_modes_send(
-        chan,
-        mode_count,
-        index,
-        MAV_STANDARD_MODE::MAV_STANDARD_MODE_NON_STANDARD,
-        mode_number,
-        0, // MAV_MODE_PROPERTY bitmask
-        name
-    );
-
-    return mode_count;
-}

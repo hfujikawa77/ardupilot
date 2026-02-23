@@ -179,6 +179,7 @@ private:
     AP_Float _stop_speed;           // speed control stop speed.  Motor outputs to zero once vehicle speed falls below this value
     AP_Float _steer_accel_max;      // steering angle acceleration max in deg/s/s
     AP_Float _steer_rate_max;       // steering rate control maximum rate in deg/s
+    AP_Float _steer_decel_max;      // steering angle deceleration max in deg/s/s
     AP_Float _turn_lateral_G_max;   // sterring maximum lateral acceleration limit in 'G'
 
     // steering control

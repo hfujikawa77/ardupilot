@@ -39,7 +39,6 @@ protected:
 #if HAL_LOGGING_ENABLED
     uint32_t log_radio_bit() const override { return MASK_LOG_PM; }
 #endif
-
     // send WATER_DEPTH - metres and temperature
     void send_water_depth() const;
 
@@ -57,6 +56,7 @@ private:
     void handle_landing_target(const mavlink_landing_target_t &msg, uint32_t timestamp_ms) override;
 
     void send_servo_out();
+    void send_acc_ignore_must_be_set_message(const char *msgname);
 
     void packetReceived(const mavlink_status_t &status, const mavlink_message_t &msg) override;
 
