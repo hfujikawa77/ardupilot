@@ -40,6 +40,10 @@ void ModeAuto::_exit()
     if (mission.state() == AP_Mission::MISSION_RUNNING) {
         mission.stop();
     }
+
+    // clear fixed heading and lateral output to prevent residual drift
+    g2.wp_nav.clear_fixed_heading();
+    g2.motors.set_lateral(0.0f);
 }
 
 void ModeAuto::update()

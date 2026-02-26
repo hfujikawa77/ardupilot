@@ -336,6 +336,11 @@ bool ModeGuided::set_desired_location(const Location &destination, Location next
 // set desired attitude
 void ModeGuided::set_desired_heading_and_speed(float yaw_angle_cd, float target_speed)
 {
+    // clear fixed heading/lateral state if active (e.g. transitioning from WP submode)
+    if (g2.wp_nav.has_fixed_heading()) {
+        clear_fixed_heading();
+    }
+
     // initialisation and logging
     _guided_mode = SubMode::HeadingAndSpeed;
     _des_att_time_ms = AP_HAL::millis();
@@ -364,6 +369,11 @@ void ModeGuided::set_desired_heading_delta_and_speed(float yaw_delta_cd, float t
 // set desired velocity
 void ModeGuided::set_desired_turn_rate_and_speed(float turn_rate_cds, float target_speed)
 {
+    // clear fixed heading/lateral state if active (e.g. transitioning from WP submode)
+    if (g2.wp_nav.has_fixed_heading()) {
+        clear_fixed_heading();
+    }
+
     // handle initialisation
     _guided_mode = SubMode::TurnRateAndSpeed;
     _des_att_time_ms = AP_HAL::millis();
@@ -382,6 +392,11 @@ void ModeGuided::set_desired_turn_rate_and_speed(float turn_rate_cds, float targ
 // set steering and throttle (both in the range -1 to +1)
 void ModeGuided::set_steering_and_throttle(float steering, float throttle)
 {
+    // clear fixed heading/lateral state if active (e.g. transitioning from WP submode)
+    if (g2.wp_nav.has_fixed_heading()) {
+        clear_fixed_heading();
+    }
+
     _guided_mode = SubMode::SteeringAndThrottle;
     _strthr_time_ms = AP_HAL::millis();
     _strthr_steering = constrain_float(steering, -1.0f, 1.0f);
@@ -459,14 +474,20 @@ void ModeGuided::set_fixed_heading(float heading_deg)
         return;
     }
 
-    // set fixed heading on waypoint navigator
-    g2.wp_nav.set_fixed_heading(radians(heading_deg));
+    // only log when heading actually changes (avoid spam from high-rate SET_POSITION_TARGET)
+    const float heading_rad = radians(heading_deg);
+    if (!g2.wp_nav.has_fixed_heading() || fabsf(wrap_PI(heading_rad - g2.wp_nav.get_fixed_heading_rad())) > radians(1.0f)) {
+        GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Guided: fixed heading %.1f deg", static_cast<double>(heading_deg));
+    }
 
-    GCS_SEND_TEXT(MAV_SEVERITY_INFO, "Guided: fixed heading %.1f deg", static_cast<double>(heading_deg));
+    // set fixed heading on waypoint navigator
+    g2.wp_nav.set_fixed_heading(heading_rad);
 }
 
 // clear fixed heading (resume normal heading-to-target behavior)
 void ModeGuided::clear_fixed_heading()
 {
     g2.wp_nav.clear_fixed_heading();
+    g2.motors.set_lateral(0.0f);
+    attitude_control.relax_I();
 }

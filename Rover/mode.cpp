@@ -447,10 +447,12 @@ void Mode::navigate_to_waypoint()
         const float desired_lateral_speed = g2.wp_nav.get_lateral_speed();
 
         // use lateral speed controller to get output
+        // pass false for motor limits: steering saturation flags are not applicable to lateral movement
+        // lateral output saturation is handled internally by _lateral_limit_low/_lateral_limit_high
         const float lateral_out = attitude_control.get_lateral_out_speed(
             desired_lateral_speed,
-            g2.motors.limit.steer_left,   // reuse steering limits for lateral
-            g2.motors.limit.steer_right,
+            false,
+            false,
             rover.G_Dt);
 
         // send lateral output to motors (scale from -1~+1 to -100~+100)

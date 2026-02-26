@@ -1225,11 +1225,6 @@ float AR_AttitudeControl::get_desired_lateral_speed_accel_limited(float desired_
     // use previous desired lateral speed as basis for accel limiting
     float speed_prev = _desired_lateral_speed;
 
-    // if no recent calls to lateral speed controller limit based on current lateral speed
-    if (!lateral_speed_control_active()) {
-        get_lateral_speed(speed_prev);
-    }
-
     // acceleration limit desired lateral speed (use same accel/decel limits as forward/back)
     float speed_change_max;
     if (fabsf(desired_lateral_speed) < fabsf(_desired_lateral_speed) && is_positive(_throttle_decel_max)) {
