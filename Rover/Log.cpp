@@ -27,6 +27,11 @@ void Rover::Log_Write_Attitude()
     if (g2.sailboat.sail_enabled()) {
         logger.Write_PID(LOG_PIDR_MSG, g2.attitude_control.get_sailboat_heel_pid().get_pid_info());
     }
+
+    // log lateral speed PID for omni vehicles
+    if (g2.attitude_control.lateral_speed_control_active()) {
+        logger.Write_PID(LOG_PIDL_MSG, g2.attitude_control.get_lateral_speed_pid_info());
+    }
 }
 
 #if AP_RANGEFINDER_ENABLED
@@ -306,6 +311,24 @@ const LogStructure Rover::log_structure[] = {
     
     { LOG_GUIDEDTARGET_MSG, sizeof(log_GuidedTarget),
       "GUIP",  "QBffffff",    "TimeUS,Type,pX,pY,pZ,vX,vY,vZ", "s-mmmnnn", "F-000000" },
+
+// @LoggerMessage: PIDL
+// @Description: Proportional/Integral/Derivative gain values for lateral speed
+// @Field: TimeUS: Time since system startup
+// @Field: Tar: desired lateral speed
+// @Field: Act: achieved lateral speed
+// @Field: Err: error between target and achieved
+// @Field: P: proportional part of PID
+// @Field: I: integral part of PID
+// @Field: D: derivative part of PID
+// @Field: FF: controller feed-forward portion of response
+// @Field: DFF: controller derivative feed-forward portion of response
+// @Field: Dmod: scaler applied to D gain to reduce limit cycling
+// @Field: SRate: slew rate used in slew limiter
+// @Field: Flags: bitmask of PID state flags
+
+    { LOG_PIDL_MSG, sizeof(log_PID),
+      "PIDL", PID_FMT, PID_LABELS, PID_UNITS, PID_MULTS, true },
 };
 
 uint8_t Rover::get_num_log_structures() const
